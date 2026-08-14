@@ -63,7 +63,12 @@ ANN_GTF=<REPLACE: /path/to/transcript/annotation.gtf>  # Ensembl GTF
 BWA=bwa         # full path if BWA is not on $PATH
 SAM=samtools    # full path if samtools is not on $PATH
 
-CUT=5           # SPRINT minimum coverage cutoff
+# SPRINT's -c: trim the first N bp of each read (default 0). This is read
+# trimming, NOT a coverage or cluster-size threshold. Set to 0 to disable.
+# Do not confuse it with SPRINT's cluster-size defaults (-csrg / -cshp, both
+# 5 when no repeat annotation is supplied via -rp), which coincidentally
+# share the value 5.
+CUT=5
 CPU=8           # should match PBS ncpus above
 # ──────────────────────────────────────────────────────────────────────────────
 

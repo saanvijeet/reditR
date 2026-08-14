@@ -14,6 +14,20 @@
   quality and do not generalise across two-arm, multi-arm and paired
   designs. The two-line idiom is given in `@details`.
 
+* `inst/scripts/bulk_bam_to_fastq.sh` now handles paired-end BAMs. It
+  previously passed only `-fq` to `bamToFastq`, which writes both mates
+  into one file with no mate information, so a paired-end BAM would be
+  silently flattened and then processed by SPRINT as single-end. Layout
+  is detected from the first alignment record's FLAG (overridable with
+  `PAIRED=0`/`PAIRED=1`), and paired input is split into `<out>_1.fastq`
+  and `<out>_2.fastq`. The template is not covered by the test suite,
+  which has no BAM fixtures; this is now stated in the script header.
+
+* `inst/scripts/scrna_preprocessing.sh` no longer describes SPRINT's `-c`
+  as a "minimum coverage cutoff". `-c` trims the first N bp of each read.
+  The comment is corrected and now warns against confusing it with the
+  cluster-size defaults `-csrg`/`-cshp`, which happen to share the value 5.
+
 * New `inst/scripts/test_data/mouse/`: the two annotation builders that
   produced the analysed mouse (E-MTAB-8145) clusters, copied verbatim,
   with a README recording that they apply no minimum cluster-size filter
