@@ -10,6 +10,7 @@ filter_editing_sites(
   min_coverage = 10,
   min_edited = 2,
   min_groups = 2,
+  min_edit_ratio = 0,
   cluster_window = 50
 )
 }
@@ -28,6 +29,10 @@ filter_editing_sites(
 
 \item{min_groups}{Minimum number of distinct samples a site must appear in
 after per-row filtering. Default 2.}
+
+\item{min_edit_ratio}{Minimum editing ratio (\code{edited / total}) per
+observation. Default 0, which applies no ratio filter. Set to e.g. 0.01 to
+require a 1\% editing ratio.}
 
 \item{cluster_window}{Maximum distance in bp between two sites on the same
 chromosome for them to be considered clustered. Default 50.}
@@ -48,6 +53,23 @@ equivalent of \code{filtered_sites.R} in the original pipeline.
 \details{
 The HPC/SPRINT helper script that produces the input file is shipped at
 \code{system.file("scripts", "extracting_read_counts.sh", package = "reditR")}.
+
+
+The filters applied here are quality-control filters: they describe
+properties of an observation (depth, edited reads, editing ratio) or of a
+site across samples, and are independent of the contrast being tested.
+
+Design-dependent filters are deliberately \emph{not} supported, because they
+depend on the comparison rather than on data quality and do not generalise
+across two-arm, multi-arm and paired designs. Requiring a site to be present
+in both arms, for example, is two lines against the returned table:
+
+\preformatted{
+res <- filter_editing_sites(path, min_groups = 4)
+ok  <- merge(data.table::as.data.table(res$all), meta, by = "sample")[
+         , .(keep = data.table::uniqueN(condition) == 2), by = site][keep == TRUE, site]
+sites <- res$all[res$all$site %in% ok, ]
+}
 }
 \examples{
 \dontrun{

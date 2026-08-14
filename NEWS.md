@@ -1,3 +1,25 @@
+# reditR 0.2.2
+
+* `filter_editing_sites()` gains a `min_edit_ratio` argument (default `0`,
+  unchanged behaviour) applying a minimum per-observation editing ratio
+  after the coverage and edited-read filters. Applied only when
+  `min_edit_ratio > 0`: `edit_ratio` is `NaN` where `total == 0` and
+  `NaN >= 0` is `NA`, so an unconditional filter would silently discard
+  zero-coverage rows whenever `min_coverage` is `0`.
+
+* `filter_editing_sites()` documentation now states that only
+  quality-control filters are supported, and that design-dependent
+  filters -- requiring a site in both arms, for example -- belong with
+  the caller, since they depend on the contrast rather than on data
+  quality and do not generalise across two-arm, multi-arm and paired
+  designs. The two-line idiom is given in `@details`.
+
+* New `inst/scripts/test_data/mouse/`: the two annotation builders that
+  produced the analysed mouse (E-MTAB-8145) clusters, copied verbatim,
+  with a README recording that they apply no minimum cluster-size filter
+  -- unlike `inst/scripts/build_splitter_annotation.sh`, which is a
+  single-library smoke test and not the production path.
+
 # reditR 0.2.1
 
 * `differential_editing()` gains a `random_effects` argument controlling

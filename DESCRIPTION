@@ -1,7 +1,7 @@
 Package: reditR
 Type: Package
 Title: Differential RNA Editing Analysis for Bulk and Single-Cell Pseudobulk Data
-Version: 0.2.1
+Version: 0.2.2
 Authors@R:
     person(given = "Saanvi",
            family = "Jiteendra",

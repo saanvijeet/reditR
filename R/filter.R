@@ -18,8 +18,28 @@
 #' @param min_edited Minimum edited read count per observation. Default 2.
 #' @param min_groups Minimum number of distinct samples a site must appear in
 #'   after per-row filtering. Default 2.
+#' @param min_edit_ratio Minimum editing ratio (\code{edited / total}) per
+#'   observation. Default 0, which applies no ratio filter. Set to e.g. 0.01 to
+#'   require a 1\% editing ratio.
 #' @param cluster_window Maximum distance in bp between two sites on the same
 #'   chromosome for them to be considered clustered. Default 50.
+#'
+#' @details
+#' The filters applied here are quality-control filters: they describe
+#' properties of an observation (depth, edited reads, editing ratio) or of a
+#' site across samples, and are independent of the contrast being tested.
+#'
+#' Design-dependent filters are deliberately \emph{not} supported, because they
+#' depend on the comparison rather than on data quality and do not generalise
+#' across two-arm, multi-arm and paired designs. Requiring a site to be present
+#' in both arms, for example, is two lines against the returned table:
+#'
+#' \preformatted{
+#' res <- filter_editing_sites(path, min_groups = 4)
+#' ok  <- merge(data.table::as.data.table(res$all), meta, by = "sample")[
+#'          , .(keep = data.table::uniqueN(condition) == 2), by = site][keep == TRUE, site]
+#' sites <- res$all[res$all$site %in% ok, ]
+#' }
 #'
 #' @return A named list with two elements:
 #'   \describe{
@@ -39,6 +59,7 @@ filter_editing_sites <- function(data_path,
                                   min_coverage   = 10,
                                   min_edited     = 2,
                                   min_groups     = 2,
+                                  min_edit_ratio = 0,
                                   cluster_window = 50) {
 
   # Load editing data
@@ -48,9 +69,19 @@ filter_editing_sites <- function(data_path,
   data <- data %>%
     mutate(edit_ratio = edited / total)
 
-  # Filter: coverage, edited reads, site in >= min_groups samples
+  # Filter: coverage, edited reads, editing ratio, site in >= min_groups samples
   data_filtered <- data %>%
-    filter(total >= min_coverage, edited >= min_edited) %>%
+    filter(total >= min_coverage, edited >= min_edited)
+
+  # Applied only when requested. edit_ratio is NaN where total == 0, and
+  # NaN >= 0 is NA, which filter() drops -- so an unconditional ratio filter
+  # would silently discard zero-coverage rows whenever min_coverage is 0.
+  if (min_edit_ratio > 0) {
+    data_filtered <- data_filtered %>%
+      filter(edit_ratio >= min_edit_ratio)
+  }
+
+  data_filtered <- data_filtered %>%
     group_by(site) %>%
     filter(n_distinct(sample) >= min_groups) %>%
     ungroup()
