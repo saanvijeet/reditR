@@ -146,3 +146,54 @@ test_that("default random_effects is unchanged and still matches (1 | sample)", 
                                        verbose = FALSE)
   expect_equal(res$glmm_pvalue, res_explicit$glmm_pvalue)
 })
+
+# ---- condition contrast direction -----------------------------------------
+
+test_that("reference_level is honoured when the case level sorts first alphabetically", {
+  # glmer coerces a character `condition` to a factor with alphabetically
+  # ordered levels. Without an explicit relevel, coef_name (condition<case>)
+  # names a coefficient that does not exist whenever case_level sorts before
+  # reference_level, the lookup error is swallowed by tryCatch, and every site
+  # returns NA -- indistinguishable from universal convergence failure.
+  meta  <- data.table::fread(metadata_file)
+  remap <- c(control = "zref", diabetic = "acase")   # case now sorts first
+  meta[, condition := as.character(remap[condition])]
+  mf <- tempfile(fileext = ".txt")
+  data.table::fwrite(meta, mf, sep = "\t")
+  on.exit(unlink(mf))
+
+  ref <- differential_editing(editing_file, metadata_file, test = "glmm", verbose = FALSE)
+  got <- differential_editing(editing_file, mf, test = "glmm",
+                              reference_level = "zref", case_level = "acase",
+                              verbose = FALSE)
+
+  expect_false(all(is.na(got$glmm_pvalue)))
+  # Relabelling the same partition cannot change the Wald p-value for the
+  # condition contrast -- only the sign of the estimate.
+  expect_equal(got$glmm_pvalue, ref$glmm_pvalue)
+  expect_equal(got$GLMM_sig,    ref$GLMM_sig)
+})
+
+test_that("all three tests are unaffected by which level sorts first", {
+  meta  <- data.table::fread(metadata_file)
+  remap <- c(control = "zref", diabetic = "acase")
+  meta[, condition := as.character(remap[condition])]
+  mf <- tempfile(fileext = ".txt")
+  data.table::fwrite(meta, mf, sep = "\t")
+  on.exit(unlink(mf))
+
+  ref <- differential_editing(editing_file, metadata_file, verbose = FALSE)
+  got <- differential_editing(editing_file, mf, reference_level = "zref",
+                              case_level = "acase", verbose = FALSE)
+
+  expect_equal(got$fisher_pvalue, ref$fisher_pvalue)
+  expect_equal(got$wilcox_pvalue, ref$wilcox_pvalue)
+})
+
+test_that("a condition level absent from the data errors instead of returning all NA", {
+  expect_error(
+    differential_editing(editing_file, metadata_file, test = "glmm",
+                         case_level = "not_a_condition", verbose = FALSE),
+    "condition level\\(s\\) not present in data"
+  )
+})

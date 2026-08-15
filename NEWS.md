@@ -1,5 +1,23 @@
 # reditR 0.2.2
 
+* **Bug fix:** `differential_editing()` now sets the `condition` contrast
+  explicitly with `reference_level` as the base. Previously `condition`
+  reached `glmer()` as a character vector, which R coerces to a factor with
+  alphabetically ordered levels -- not necessarily `reference_level` first.
+  The Wald p-value is looked up by the coefficient name
+  `paste0("condition", case_level)`, so whenever `case_level` sorted before
+  `reference_level` the fitted coefficient carried the other name, the lookup
+  failed, the error was swallowed by the per-site `tryCatch()`, and **every
+  site silently returned `NA`** -- a wholly null result indistinguishable
+  from universal convergence failure. All condition pairs used in the
+  bundled examples happen to sort safely (`control` < `diabetic`), so
+  existing results are unaffected, but e.g.
+  `reference_level = "treated", case_level = "control"` was silently broken.
+
+* `differential_editing()` now errors up front if `reference_level` or
+  `case_level` is absent from the data, instead of failing later with
+  `object 'glmm_pvalue' not found` once every site has been skipped.
+
 * `filter_editing_sites()` gains a `min_edit_ratio` argument (default `0`,
   unchanged behaviour) applying a minimum per-observation editing ratio
   after the coverage and edited-read filters. Applied only when

@@ -123,6 +123,22 @@ differential_editing <- function(data_path,
     data <- merge(data, meta, by = "sample")
   }
   data <- data[condition %in% c(reference_level, case_level)]
+
+  absent <- setdiff(c(reference_level, case_level), unique(as.character(data$condition)))
+  if (length(absent) > 0)
+    stop("condition level(s) not present in data: ", paste(absent, collapse = ", "),
+         ". Check reference_level / case_level against the condition column.")
+
+  # glmer coerces a character `condition` to a factor with ALPHABETICALLY
+  # ordered levels, which is not necessarily reference_level first. coef_name
+  # below is built as paste0("condition", case_level), so whenever case_level
+  # sorted first the model's coefficient was named after reference_level
+  # instead, the lookup missed, the error was swallowed by tryCatch, and every
+  # site returned NA -- a completely null result indistinguishable from
+  # universal convergence failure. Set the contrast explicitly.
+  data[, condition := factor(as.character(condition),
+                             levels = c(reference_level, case_level))]
+
   if (!"unedited" %in% names(data))   data[, unedited   := total - edited]
   if (!"edit_ratio" %in% names(data)) data[, edit_ratio := edited / total]
 
