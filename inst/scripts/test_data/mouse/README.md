@@ -45,13 +45,19 @@ smoke test** (`SAMPLE_PREFIX="SAMEA11354569"`, paths under `mec5_smoketest/`);
 it did not produce the analysed annotations. Do not cite it as the method for
 the full dataset — doing so would assert a filter that never ran.
 
-The consequence is visible downstream: the analysed dataset contains 96
-cluster-level pseudobulk samples, and the number of detected editing sites per
-sample ranges from 1 to 1,238 (median 17; 39 of 96 below 10 sites). The
-smallest — e.g. `CEC5_cluster_11`, `GEC2_cluster_13`, `MEC2_cluster_16` — carry
-a single site on 10–13 reads. Anyone reproducing this analysis should decide
+The consequence is visible downstream: the analysed dataset contains **192**
+cluster-level pseudobulk units across 13 libraries (45 control, 147
+dehydrated), and the number of detected editing sites per unit ranges from
+**1 to 10,391** (median 84; **46 of 192** below 10 sites, 99 below 100). The
+smallest carry a single site. Anyone reproducing this analysis should decide
 deliberately whether to keep that behaviour or add a threshold; it is recorded
 here rather than silently corrected.
+
+These figures come from `all_ec_clustered_with_condition.txt`, the input the
+differential analysis actually consumed — 18,359 sites, matching the DRE output
+row for row. An earlier revision of this README quoted 96 units / median 17 /
+39 below 10 sites; those came from a superseded 1,781-site file of the same
+name in a different directory and did not describe the analysed data.
 
 ## Libraries built vs libraries analysed
 
