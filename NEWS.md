@@ -1,5 +1,17 @@
 # reditR 0.2.2
 
+* Test coverage for the negative direction in `editing_difference()`. The
+  bundled fixture contains only an increase (chr1_100, +0.17) and a flat site
+  (chr1_200, -0.001), so every delta in it is >= 0. Two things were therefore
+  untested: whether a genuine decrease is reported with the correct sign and
+  magnitude, and whether the output ordering is really by ABSOLUTE effect --
+  with no negative values present, `order(-abs(delta))` and `order(-delta)`
+  produce identical output, so the existing sort assertion could not
+  distinguish them. Three blocks added, using a self-contained temporary
+  fixture spanning -0.30, +0.20 and 0.00; the ordering assertion was verified
+  to discriminate between the two sort keys. No change to any function -- the
+  behaviour was already correct, but it was not pinned.
+
 * New `inst/scripts/calibration/`: the scripts used to assess whether
   `differential_editing()` controls its false discovery rate — the parametric
   sweep over between-sample variance and sample size, QC on the simulator, the
