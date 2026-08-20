@@ -1,0 +1,31 @@
+#!/usr/bin/bash
+#PBS -N perm_mouse
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=06:00:00
+#PBS -j oe
+#PBS -J 1-15
+
+# Exhaustive permutation null for the mouse dataset. 285 nulls (C(13,3) = 286
+# control-library sets minus the true one; unequal arms so no complement
+# symmetry). ~1.7 min each => ~8 h serial, split into 15 tasks of 19.
+#
+# CAVEAT carried from the script header: condition is completely confounded
+# with timepoint and partly with compartment balance, so relabelling destroys
+# structure the real design has. This makes the mouse null less clean than
+# endothelial2's or diabetes's, and the empirical p should be read with that
+# in mind rather than as a like-for-like comparison.
+
+set -euo pipefail
+eval "$(~/miniforge3/bin/conda shell.bash hook)"
+conda activate rna_editing
+cd /rds/general/user/sj1825/home/msc_prj/test_data_mouse
+
+N_TOTAL=285; CHUNK=19
+FROM=$(( (PBS_ARRAY_INDEX - 1) * CHUNK + 1 ))
+TO=$(( PBS_ARRAY_INDEX * CHUNK ))
+[[ $TO -gt $N_TOTAL ]] && TO=$N_TOTAL
+[[ $FROM -gt $N_TOTAL ]] && { echo "nothing to do"; exit 0; }
+
+echo "[$(date)] task ${PBS_ARRAY_INDEX}: permutations ${FROM}-${TO}"
+PERM_FROM=$FROM PERM_TO=$TO N_CORES=8 Rscript reditr_permutation_null_mouse.R
+echo "[$(date)] done"

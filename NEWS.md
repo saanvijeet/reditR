@@ -1,5 +1,17 @@
 # reditR 0.2.2
 
+* New `inst/scripts/calibration/`: the scripts used to assess whether
+  `differential_editing()` controls its false discovery rate — the parametric
+  sweep over between-sample variance and sample size, QC on the simulator, the
+  shared-effect and cross-site-correlation experiments, and the four
+  permutation nulls (one per dataset, since the labelling space depends on the
+  design) with their PBS array wrappers. Previously these existed only in the
+  analysis tree, so the calibration results could not be reproduced from the
+  package. They are records of specific analyses rather than portable
+  utilities: paths are hardcoded and the permutation scripts assume a
+  particular group structure. `qc_permutation_null.R` validates the
+  permutation procedure itself and should be re-run if that code is adapted.
+
 * **Bug fix:** `differential_editing()` now sets the `condition` contrast
   explicitly with `reference_level` as the base. Previously `condition`
   reached `glmer()` as a character vector, which R coerces to a factor with

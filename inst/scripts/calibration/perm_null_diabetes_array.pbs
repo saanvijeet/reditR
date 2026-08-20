@@ -1,0 +1,37 @@
+#!/usr/bin/bash
+#PBS -N perm_dia
+#PBS -l select=1:ncpus=8:mem=32gb
+#PBS -l walltime=08:00:00
+#PBS -j oe
+#PBS -J 1-24
+
+# Exhaustive permutation null for the diabetes dataset.
+#
+# 461 distinct non-trivial 6v6 relabellings (C(12,6)/2 = 462 partitions after
+# collapsing complements, minus the true one). The previous run sampled 9 of
+# these at random, which pinned the empirical p at the 1/10 = 0.100 floor and
+# produced p = 0.200 -- a compute limit reported as though it were a property
+# of the design. Running all 461 lowers the attainable floor to 1/462 =
+# 0.00216.
+#
+# ~4.4 min per permutation => ~34 h serial. Split across 24 array tasks of 20
+# permutations each (~90 min per task). Each task writes its own chunk file;
+# concatenate before scoring.
+
+set -euo pipefail
+eval "$(~/miniforge3/bin/conda shell.bash hook)"
+conda activate rna_editing
+
+cd /rds/general/user/sj1825/home/diabetes_output
+
+N_TOTAL=461
+CHUNK=20
+FROM=$(( (PBS_ARRAY_INDEX - 1) * CHUNK + 1 ))
+TO=$(( PBS_ARRAY_INDEX * CHUNK ))
+[[ $TO -gt $N_TOTAL ]] && TO=$N_TOTAL
+[[ $FROM -gt $N_TOTAL ]] && { echo "chunk beyond range, nothing to do"; exit 0; }
+
+echo "[$(date)] task ${PBS_ARRAY_INDEX}: permutations ${FROM}-${TO}"
+PERM_FROM=$FROM PERM_TO=$TO N_CORES=8 \
+  Rscript reditr_permutation_null_diabetes.R
+echo "[$(date)] done"
