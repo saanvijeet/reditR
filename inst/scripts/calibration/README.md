@@ -23,7 +23,7 @@ failure*. Where they disagree, the disagreement is the finding.
 | Script | Purpose |
 |---|---|
 | `reditr_parametric_null.R` | The sweep. `sample_re_sd` × `n_per_condition` × 3 seeds = 45 cells, each 800 true-null plus 300 known-effect sites, via `simulate_editing_data()` → `differential_editing()` → `validate_against_truth()`. Grid is set by environment variables (`SIGMAS`, `NPC`, `N_REPS`, `N_NULL`, `N_CORES`), so this is the most reusable script here. |
-| `qc_reditr_simulations.R` | QC on the generator: parameter recovery, and dispersion (Pearson chi-square / df) of simulated against real data. |
+| `qc_reditr_simulations.R` | QC on the generator: parameter recovery, and dispersion (Pearson chi-square / df) of simulated against all three real datasets. Reports `pct_estimable` beside each dispersion, because dispersion does not exist for a site × condition group of one observation and small designs are mostly such groups. |
 | `reditr_shared_effect_sim.R` | Tests whether a per-sample random intercept shared *across* sites — which `simulate_editing_data()` does not generate — reproduces the observed inflation. It does not. |
 | `measure_cross_site_correlation.R` | Measures site-to-site correlation in simulated versus real data, reported separately for different-chromosome pairs so read-sharing between nearby sites is excluded. |
 

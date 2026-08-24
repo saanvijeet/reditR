@@ -27,6 +27,14 @@
 #     phi   = sum( (edited_j - total_j*p_hat)^2 / (total_j*p_hat*(1-p_hat)) ) / (n-1)
 # phi ~ 1 is binomial; phi > 1 is overdispersed.
 #
+# phi is a within-group variance and does not exist for a site x condition
+# group holding one observation, so the table also carries pct_estimable and
+# n_median. All three datasets are profiled, but they are not equally
+# informative: endothelial2 is 3 replicates per arm with sites called per
+# sample, and roughly half its groups are singletons. It is reported twice --
+# over all estimable groups, and over sites detected in all 9 samples -- since
+# those two subsets disagree by a factor of ~2 and straddle phi = 1.
+#
 # Output: qc_reditr_simulations.txt (tables), console report
 
 suppressPackageStartupMessages({ library(data.table); library(reditR) })
@@ -94,15 +102,30 @@ cat("  expected: sd_logit_obs tracks sigma_set | delta_XX ~ its nominal effect s
 # =====================================================================
 cat("\n\n=========== B. REALISM vs REAL DATA ===========\n")
 
+# Dispersion is a WITHIN-group variance, so it does not exist for a
+# site x condition group holding a single observation. That is not a nuisance
+# to be hidden: in a small design with sites called per sample, most groups
+# can be singletons and the median phi is then computed on an unrepresentative
+# minority of sites. pct_estimable and n_median are reported next to phi so
+# the reader can judge how much weight the phi column carries.
+disp_row <- function(nm, e) {
+  e <- e[total > 0]
+  grp <- e[, .N, by = .(site, condition)]
+  data.table(source        = nm,
+             phi_median    = median(dispersion(e), na.rm = TRUE),
+             pct_estimable = round(100 * mean(grp$N >= 2L), 1),
+             n_median      = as.numeric(median(grp$N)),
+             cov_median    = as.numeric(median(e$total)),
+             ratio_median  = median(e$edited / e$total),
+             n_site_cond   = nrow(grp))
+}
+
 sim_disp <- rbindlist(lapply(c(0, 0.25, 1.0), function(sg) {
   s <- simulate_editing_data(n_null = 800L, n_effects = c(`0.10` = 100),
                              n_per_condition = 6L, sample_re_sd = sg, seed = 7L)
   e <- merge(as.data.table(s$editing), as.data.table(s$metadata), by = "sample")
   e <- merge(e, as.data.table(s$truth), by = "site")[true_effect == 0]
-  data.table(source = sprintf("simulated, sigma=%.2f", sg),
-             phi_median = median(dispersion(e), na.rm = TRUE),
-             cov_median = median(e$total), ratio_median = median(e$edited / e$total),
-             n_site_cond = uniqueN(e[, .(site, condition)]))
+  disp_row(sprintf("simulated, sigma=%.2f", sg), e)
 }))
 
 real <- list()
@@ -113,13 +136,17 @@ real[["diabetes cardiomyocytes (6v6)"]] <- dia[, .(site, sample, edited, total, 
 mo <- fread("/rds/general/user/sj1825/ephemeral/mec_dehydration/sprint_output_full/all_ec_clustered_with_condition.txt")
 real[["mouse pseudobulk"]] <- mo[, .(site, sample, edited, total, condition)]
 
-real_disp <- rbindlist(lapply(names(real), function(nm) {
-  e <- real[[nm]]
-  data.table(source = nm, phi_median = median(dispersion(e), na.rm = TRUE),
-             cov_median = as.numeric(median(e$total)),
-             ratio_median = median(e$edited / e$total),
-             n_site_cond = uniqueN(e[, .(site, condition)]))
-}))
+# endothelial2: 3 arms x 3 replicates. Reported as two subsets because they
+# disagree by a factor of ~2 and neither is the obviously correct one; see the
+# note printed below the table.
+en <- merge(fread(file.path(H, "endothelial2/output/filtered_sites_clustered.txt")),
+            fread(file.path(H, "endothelial2/output/sample_metadata.txt")), by = "sample")
+en <- en[, .(site, sample, edited, total, condition)]
+real[["endothelial2 (3x3), all sites"]] <- en
+complete <- en[total > 0, uniqueN(sample), by = site][V1 == uniqueN(en$sample), site]
+real[["endothelial2 (3x3), 9-sample sites"]] <- en[site %in% complete]
+
+real_disp <- rbindlist(lapply(names(real), function(nm) disp_row(nm, real[[nm]])))
 
 disp <- rbind(sim_disp, real_disp)
 disp[, `:=`(phi_median = round(phi_median, 2), ratio_median = round(ratio_median, 3))]
@@ -129,6 +156,12 @@ report$dispersion <- disp
 cat("\n  phi ~ 1 means residual variance is binomial, as the simulator assumes.\n")
 cat("  phi >> simulated means real data is harder than the simulation, and the\n")
 cat("  sweep's false-positive rates are LOWER BOUNDS on the real ones.\n")
+cat("\n  Read phi together with pct_estimable. endothelial2 has 3 replicates per\n")
+cat("  arm and sites called per sample, so most site x condition groups hold a\n")
+cat("  single observation and phi does not exist for them. Restricting to sites\n")
+cat("  seen in all 9 samples makes phi estimable throughout but selects the\n")
+cat("  best-covered sites, and the two subsets straddle phi = 1. Neither is\n")
+cat("  precise enough to place against the simulated range on its own.\n")
 
 fwrite(rec,  "qc_reditr_simulations.txt", sep = "\t")
 fwrite(disp, "qc_reditr_simulations.txt", sep = "\t", append = TRUE, col.names = TRUE)
