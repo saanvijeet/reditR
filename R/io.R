@@ -69,15 +69,24 @@ read_metadata <- function(path, reference_level = NULL) {
     stop("Missing required columns: ", paste(missing, collapse = ", "))
 
   if (!is.null(reference_level)) {
-    # Put the requested reference group first so it is used as the
-    # baseline in downstream models.
+    # Check the requested reference level is actually present, and list the
+    # available levels if it is not.
     if (!reference_level %in% dt$condition)
       stop("reference_level '", reference_level,
            "' not found in condition column. Available levels: ",
            paste(unique(dt$condition), collapse = ", "))
 
-    # Set the reference condition first so that downstream models use
-    # it as the baseline for estimating the condition effect.
+    # Put the reference condition first in the factor levels. Coercing a
+    # character column to a factor orders the levels alphabetically, and
+    # under treatment contrasts the first level is the baseline -- so the
+    # baseline would otherwise be whichever condition happens to sort first,
+    # which flips the sign of the estimated effect and changes the name of
+    # the fitted coefficient.
+    #
+    # This is for callers who fit their own models from this table.
+    # differential_editing() and editing_difference() read the metadata file
+    # directly rather than through read_metadata(), and differential_editing()
+    # sets the contrast itself, so neither depends on the ordering set here.
     other_levels <- setdiff(unique(as.character(dt$condition)), reference_level)
     dt[, condition := factor(condition,
                              levels = c(reference_level, other_levels))]
