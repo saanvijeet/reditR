@@ -8,38 +8,25 @@
 #' The HPC/SPRINT helper script that produces the input file is shipped at
 #' \code{system.file("scripts", "extracting_read_counts.sh", package = "reditR")}.
 #'
-#' @param data_path Path to the merged per-sample editing count file
-#'   (\code{all_samples_editing.txt}). Required columns: \code{site},
-#'   \code{sample}, \code{edited}, \code{total}.
-#' @param out_dir Directory where \code{filtered_sites_all.txt} and
-#'   \code{filtered_sites_clustered.txt} will be written. Pass \code{NULL}
-#'   (default) to skip writing.
-#' @param min_coverage Minimum total read coverage per observation. Default 10.
-#' @param min_edited Minimum edited read count per observation. Default 2.
-#' @param min_groups Minimum number of distinct samples a site must appear in
-#'   after per-row filtering. Default 2.
-#' @param min_edit_ratio Minimum editing ratio (\code{edited / total}) per
-#'   observation. Default 0, which applies no ratio filter. Set to e.g. 0.01 to
-#'   require a 1\% editing ratio.
-#' @param cluster_window Maximum distance in bp between two sites on the same
-#'   chromosome for them to be considered clustered. Default 50.
+#' @param data_path Path to the merged editing count file. Required columns:
+#'   \code{site}, \code{sample}, \code{edited}, and \code{total}.
+#' @param out_dir Directory for saving the filtered results. Set to
+#'   \code{NULL} to return the results without writing files.
+#' @param min_coverage Minimum total read coverage required per observation.
+#'   Default is 10.
+#' @param min_edited Minimum number of edited reads required per observation.
+#'   Default is 2.
+#' @param min_groups Minimum number of samples in which a site must be
+#'   observed. Default is 2.
+#' @param min_edit_ratio Minimum editing ratio required per observation.
+#'   Default is 0, meaning no ratio filter is applied.
+#' @param cluster_window Maximum distance in bp between neighbouring sites
+#'   on the same chromosome for them to be considered clustered. Default is 50.
 #'
 #' @details
-#' The filters applied here are quality-control filters: they describe
-#' properties of an observation (depth, edited reads, editing ratio) or of a
-#' site across samples, and are independent of the contrast being tested.
-#'
-#' Design-dependent filters are deliberately \emph{not} supported, because they
-#' depend on the comparison rather than on data quality and do not generalise
-#' across two-arm, multi-arm and paired designs. Requiring a site to be present
-#' in both arms, for example, is two lines against the returned table:
-#'
-#' \preformatted{
-#' res <- filter_editing_sites(path, min_groups = 4)
-#' ok  <- merge(data.table::as.data.table(res$all), meta, by = "sample")[
-#'          , .(keep = data.table::uniqueN(condition) == 2), by = site][keep == TRUE, site]
-#' sites <- res$all[res$all$site %in% ok, ]
-#' }
+#' Filters are based on data quality and site coverage and are independent
+#' of the experimental comparison. Condition-dependent filtering is not
+#' applied because the appropriate criteria depend on the study design.
 #'
 #' @return A named list with two elements:
 #'   \describe{
@@ -62,37 +49,41 @@ filter_editing_sites <- function(data_path,
                                   min_edit_ratio = 0,
                                   cluster_window = 50) {
 
-  # Load editing data
+  # Load the editing site counts
   data <- read.table(data_path, header = TRUE)
 
   # Calculate editing ratio
   data <- data %>%
     mutate(edit_ratio = edited / total)
 
-  # Filter: coverage, edited reads, editing ratio, site in >= min_groups samples
+  # Remove observations with insufficient read coverage or edited reads.
+  # These thresholds reduce the influence of poorly supported observations.
   data_filtered <- data %>%
     filter(total >= min_coverage, edited >= min_edited)
 
-  # Applied only when requested. edit_ratio is NaN where total == 0, and
-  # NaN >= 0 is NA, which filter() drops -- so an unconditional ratio filter
-  # would silently discard zero-coverage rows whenever min_coverage is 0.
+  # Apply an editing-ratio filter only when a threshold is requested.
+  # This preserves all observations when min_edit_ratio = 0.
   if (min_edit_ratio > 0) {
     data_filtered <- data_filtered %>%
       filter(edit_ratio >= min_edit_ratio)
   }
-
+  # Keep sites observed in enough independent samples to support
+  # downstream differential-editing analysis.
   data_filtered <- data_filtered %>%
     group_by(site) %>%
     filter(n_distinct(sample) >= min_groups) %>%
     ungroup()
 
-  # Prepare coordinates
+  # Split the site identifier into chromosome and genomic position
+  # so that neighbouring sites can be identified.
   data_filtered <- data_filtered %>%
     separate(site, into = c("chr", "pos"), sep = ":")
 
   data_filtered$pos <- as.numeric(data_filtered$pos)
 
-  # Identify clustered genomic sites
+  # Identify sites that have another site within the clustering window.
+  # Nearby sites are retained because genuine RNA-editing sites often
+  # occur in genomic clusters.
   unique_sites <- data_filtered %>%
     distinct(chr, pos)
 
@@ -106,11 +97,11 @@ filter_editing_sites <- function(data_path,
     filter(dist_prev <= cluster_window | dist_next <= cluster_window) %>%
     ungroup()
 
-  # Keep rows belonging to clustered sites
+  # Keep all sample observations belonging to clustered sites.
   clustered_sites <- data_filtered %>%
     semi_join(clustered_positions, by = c("chr", "pos"))
 
-  # Reconstruct site column
+  # Reconstruct the site identifier and keep the columns needed downstream.
   data_filtered <- data_filtered %>%
     mutate(site = paste(chr, pos, sep = ":")) %>%
     select(site, sample, edited, total, edit_ratio, chr, pos)
@@ -119,7 +110,7 @@ filter_editing_sites <- function(data_path,
     mutate(site = paste(chr, pos, sep = ":")) %>%
     select(site, sample, edited, total, edit_ratio, chr, pos)
 
-  # Save results
+  # Save both the QC-filtered sites and the clustered subset if requested.
   if (!is.null(out_dir)) {
     write.table(data_filtered,
                 file.path(out_dir, "filtered_sites_all.txt"),
