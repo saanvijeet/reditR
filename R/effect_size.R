@@ -42,14 +42,15 @@ editing_difference <- function(data_path,
                                 reference_level = "control",
                                 case_level     = "diabetic") {
 
-  # Load editing counts
+  # Load editing-site data
   data <- fread(data_path)
 
-  # Compute edit_ratio if absent
+  # Calculate editing ratio if it has not already been provided.
+  # This allows the function to work directly from edited and total read counts.
   if (!"edit_ratio" %in% names(data))
     data[, edit_ratio := edited / total]
 
-  # Merge with metadata if condition column is absent
+  # Add condition information from the metadata if it is not already in the data.
   if (!"condition" %in% names(data)) {
     if (is.null(meta_path))
       stop("'condition' column not found in data file and no meta_path supplied.")
@@ -57,11 +58,13 @@ editing_difference <- function(data_path,
     data <- merge(data, meta, by = "sample")
   }
 
-  # Column names derived from the supplied condition labels
+  # Use the condition names supplied by the user for the output columns.
   case_col <- paste0(case_level, "_mean")
   ref_col  <- paste0(reference_level, "_mean")
 
-  # Calculate mean editing per condition
+# Calculate the mean editing ratio for each condition at each site.
+# Using the mean across samples gives a site-level estimate of the
+# average editing level in each condition.
   editing_summary <- data[, .(
     case_mean = mean(edit_ratio[condition == case_level],      na.rm = TRUE),
     ref_mean  = mean(edit_ratio[condition == reference_level], na.rm = TRUE)
@@ -69,11 +72,14 @@ editing_difference <- function(data_path,
 
   setnames(editing_summary, c("case_mean", "ref_mean"), c(case_col, ref_col))
 
-  # Calculate difference
+# Calculate the signed change in editing (case minus reference).
+# Positive values indicate increased editing in the case condition;
+# negative values indicate decreased editing.
   editing_summary$editing_difference <-
     editing_summary[[case_col]] - editing_summary[[ref_col]]
 
-  # Rank sites by absolute editing change
+# Rank sites by the magnitude of their editing change.
+# Absolute values ensure both increases and decreases are prioritised.
   editing_summary <- editing_summary[order(-abs(editing_difference))]
 
   if (!is.null(out_path))
