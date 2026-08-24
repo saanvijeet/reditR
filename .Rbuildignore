@@ -6,3 +6,4 @@
 ^\.gitignore$
 ^README\.Rmd$
 ^TESTING\.md$
+^DEVELOPMENT\.md$
