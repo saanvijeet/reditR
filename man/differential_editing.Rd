@@ -20,116 +20,91 @@ differential_editing(
 )
 }
 \arguments{
-\item{data_path}{Path to the filtered and clustered editing-site count
-file. Required columns: \code{site}, \code{sample}, \code{edited},
-\code{total}. \code{edit_ratio} is computed if absent.}
+\item{data_path}{Path to the filtered and clustered editing-site count file.
+Required columns are \code{site}, \code{sample}, \code{edited}, and
+\code{total}. Editing ratios are calculated if not already provided.}
 
-\item{meta_path}{Path to the sample metadata file. Required columns:
-\code{sample}, \code{condition}. Ignored if \code{condition} is already
-present in the data file.}
+\item{meta_path}{Path to the sample metadata file. Required columns are
+\code{sample} and \code{condition}. Not required if \code{condition}
+is already included in the input data.}
 
-\item{out_path}{File path for the tab-delimited results table. Pass
-\code{NULL} (default) to skip writing.}
+\item{out_path}{Path for the output results file. Set to \code{NULL}
+to avoid writing a file.}
 
-\item{summary_path}{File path for a tab-delimited summary of key run
-metrics (sites tested, significant count per requested test). Pass
-\code{NULL} (default) to skip writing.}
+\item{summary_path}{Path for a summary file containing the number of
+tested and significant sites. Set to \code{NULL} to avoid writing a file.}
 
-\item{test}{Character vector selecting which test(s) to run. Any subset
-of \code{c("glmm", "fisher", "wilcoxon")}. Default runs all three. Only
-the requested test(s) are computed -- e.g. \code{test = "wilcoxon"}
-skips GLMM/Fisher entirely, useful when the design is known in advance
-to make GLMM unreliable (see Details).}
+\item{test}{Statistical test(s) to run. Choose from \code{"glmm"},
+\code{"fisher"}, and \code{"wilcoxon"}. Multiple tests can be selected.
+The default runs all three.}
 
-\item{reference_level}{Condition label for the reference/control group.
-Default \code{"control"}.}
+\item{reference_level}{Name of the reference/control condition.
+Default is \code{"control"}.}
 
-\item{case_level}{Condition label for the case/disease group. Default
-\code{"diabetic"}.}
+\item{case_level}{Name of the case/treated condition.
+Default is \code{"diabetic"}.}
 
-\item{random_effects}{Character string giving the random-effects side of
-the GLMM formula (everything after \code{condition +}), passed through
-to \code{lme4::glmer()}. Default \code{"(1 | sample)"} -- one random
-intercept per row, correct when each \code{sample} is one true
-biological replicate (bulk data). For single-cell pseudobulk data,
-where multiple pseudobulk units (e.g. cluster x library) share a
-library and/or a cluster identity, a single \code{sample}-level term
-pseudoreplicates -- pass crossed or nested terms instead, e.g.
-\code{"(1 | library) + (1 | cluster_id)"}, using whatever grouping
-columns are present in \code{data_path}. Ignored if \code{"glmm"} is
-not in \code{test}.}
+\item{random_effects}{Random-effect term used in the GLMM.
+Defaults to \code{"(1 | sample)"}. For pseudobulk data, this can be
+changed to account for shared libraries or clusters.}
 
-\item{min_obs}{Minimum number of observations required to test a site
-with the GLMM. Default 4.}
+\item{min_obs}{Minimum number of observations required to fit a GLMM
+for a site. Default is 4.}
 
-\item{fdr_threshold}{FDR threshold applied to BH-adjusted p-values for
-every requested test. Default 0.05.}
+\item{fdr_threshold}{BH-adjusted p-value threshold used to identify
+significant sites. Default is 0.05.}
 
-\item{n_cores}{Number of cores for parallel per-site fitting (via
-\code{parallel::mclapply}). Default 1 (serial). Always serial on
-Windows, where \code{mclapply} cannot fork.}
+\item{n_cores}{Number of CPU cores used for parallel GLMM fitting.
+Default is 1. Windows runs are always performed using one core.}
 
-\item{verbose}{Print progress and summary messages. Default \code{TRUE}.}
+\item{verbose}{Logical value indicating whether progress and summary
+information should be printed. Default is \code{TRUE}.}
 }
 \value{
-A \code{data.table} with column \code{site} plus, for each
-  requested test, \verb{<test>_pvalue}, \verb{<Test>_FDR}, and
-  \verb{<Test>_sig} (\code{TRUE} where FDR < \code{fdr_threshold}). No
-  combined verdict column is produced -- the requested tests are
-  independent options, not a consensus vote. Compare the columns you
-  asked for directly, or intersect them yourself if you want an AND.
+A \code{data.table} containing the site-level p-values,
+  BH-adjusted p-values, and significance results for each selected test.
+  Results from each test are reported independently; no combined
+  significance result is produced.
 }
 \description{
 Identifies differentially RNA-edited (DRE) sites between two conditions
-using up to three independent statistical tests: a binomial GLMM with a
-per-sample random effect, Fisher's exact test on pooled per-sample counts,
-and a Wilcoxon rank-sum test on per-sample editing ratios. All three tests
-are run on ALL sites, independently of one another -- there is no gating
-of one test on another's significance, and no combined verdict column.
-Each requested test gets its own Benjamini-Hochberg FDR correction.
-\code{test} selects which of the three are actually computed, since which
-test is most appropriate depends on the experimental design (see
-Details) -- this is deliberately a menu, not a pipeline that runs
-everything and reduces it to one answer.
+using one or more of three statistical tests: GLMM, Fisher's exact test,
+and Wilcoxon rank-sum test. Each test is run independently on all sites
+and receives its own Benjamini-Hochberg (BH) correction.
 }
 \details{
-Which test to choose depends on the experimental design -- null-
-calibration simulations (permutation nulls and parametric variance
-sweeps) across three independent datasets found a consistent pattern:
-\itemize{
-  \item \strong{GLMM} (\code{cbind(edited, unedited) ~ condition +
-    (1|sample)}) is the primary test (Srivastava et al. 2017), but can be
-    severely anti-conservative when between-replicate variance is high
-    relative to the number of independent control replicates -- in a
-    confounded or very-small-n design this inflation reached ~9-10x the
-    nominal false-positive rate. In a balanced, adequately-replicated
-    design the same test was only mildly anti-conservative.
-  \item \strong{Fisher's exact test} pools reads across samples per
-    condition; independent of GLMM, but was anti-conservative to a
-    similar degree whenever real between-replicate variance was present,
-    regardless of dataset -- and unlike GLMM, adding replicates did not
-    fix it.
-  \item \strong{Wilcoxon rank-sum} on per-sample editing ratios was the
-    most consistently well-calibrated test across every design checked,
-    at the cost of lower power and a coarse p-value floor at small
-    sample sizes (e.g. minimum ~0.05 at n=3 vs 3).
-}
-A design with few, unbalanced, or confounded replicates should lean on
-Wilcoxon; a well-powered balanced design can reasonably use GLMM. Fisher
-should be treated cautiously whenever real between-replicate variance is
-plausible. Requesting more than one test lets you compare them directly
-rather than trusting either in isolation.
+The three tests use different aspects of the editing data. GLMM models
+edited and unedited read counts while accounting for between-sample
+variability. Fisher's exact test compares pooled edited and unedited
+counts between conditions. Wilcoxon compares editing ratios between
+individual samples.
+
+The appropriate test depends on the experimental design. GLMM can be
+useful when there are sufficient independent biological replicates and
+can account for between-sample variability. Fisher's exact test is
+simple and can be used for sparse sites, but pooling reads can ignore
+biological variability. Wilcoxon does not depend on read-count
+distributions but has lower power at small sample sizes.
+
+Because test performance can depend on sample size, replication, and
+between-sample variability, users should assess calibration before
+interpreting significant sites. reditR therefore provides separate
+statistical tests rather than combining them into a single result.
 }
 \examples{
 \dontrun{
 res <- differential_editing(
   data_path = "filtered_sites_clustered.txt",
   meta_path = "sample_metadata.txt",
-  test      = c("glmm", "wilcoxon"),
-  out_path  = "DRE_results.txt"
+  test = c("glmm", "wilcoxon"),
+  out_path = "DRE_results.txt"
 )
+
+# View sites significant by GLMM
 res[GLMM_sig == TRUE]
-res[GLMM_sig == TRUE & Wilcox_sig == TRUE]   # your own AND, if you want one
+
+# Find sites significant by both tests
+res[GLMM_sig == TRUE & Wilcox_sig == TRUE]
 }
 
 }
