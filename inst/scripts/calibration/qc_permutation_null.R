@@ -1,30 +1,23 @@
 # qc_permutation_null.R
 #
-# QC on the PERMUTATION arm of the reditR validation.
+# QC for the permutation-based validation of reditR.
 #
-# The existing checks (TRUE row reproduces the published analysis; labellings
-# distinct, balanced and non-mirrored; permuted counts vary with the labels)
-# verify the plumbing. None of them tests whether the permutation PROCEDURE is
-# calibrated -- whether the empirical p it returns means what it claims.
+# This checks whether the permutation procedure behaves correctly when the
+# true answer is known.
 #
-# Two controls on data with known truth, using the package's own simulator so
-# the answer is not in question:
+# Two simulated datasets are tested:
 #
-#   NEGATIVE  no planted effect. The true labelling is then just one draw from
-#             the same null as the other nine, so the empirical p must be
-#             UNIFORM over its 10 attainable values {0.1,...,1.0}. p <= 0.1
-#             should occur ~10% of the time. Materially more than that means
-#             the procedure treats the real labelling as special when it is
-#             not -- i.e. the permutation null itself is anti-conservative and
-#             the dataset results built on it are overstated.
+#   NEGATIVE  No true effect is added. The true labels should therefore behave
+#             like the permuted labels, giving empirical p-values across the
+#             expected permutation range.
 #
-#   POSITIVE  strong planted effect in every site. The true labelling should
-#             rank first essentially always (p = 0.100, the floor). If it does
-#             not, the procedure has no power at this design and a null result
-#             from it carries no information.
+#   POSITIVE  A strong effect is added to all sites. The true labels should
+#             produce more significant sites than the permuted labels.
 #
-# Design mirrors endothelial2 exactly: 3 v 3, so C(6,3) = 20 labellings, 10
-# after collapsing complements, 9 usable nulls, floor 1/10 = 0.100.
+# The design uses 3 samples per group, matching the endothelial2 (HUVEC) dataset.
+# There are 20 possible balanced labellings, reduced to 10 after accounting
+# for group-label symmetry, with the true labelling excluded. This leaves
+# 9 null labellings.
 #
 # Output: qc_permutation_null.txt
 
@@ -37,7 +30,9 @@ N_CORES <- as.integer(Sys.getenv("N_CORES", "8"))
 SIGMA   <- as.numeric(Sys.getenv("SIGMA",   "0.25"))
 tmp <- file.path(getwd(), "qc_perm_tmp"); dir.create(tmp, showWarnings = FALSE)
 
-# the 9 non-trivial labellings for a 3v3 design, complements collapsed
+# Generate the 9 non-trivial balanced labellings for a 3-vs-3 design.
+# A labelling and its complement represent the same group partition, so only
+# one of each pair is retained.
 labsets <- local({
   truth <- c(rep("control", 3), rep("diabetic", 3))
   seen <- character(0); out <- list()
@@ -53,6 +48,9 @@ stopifnot(length(labsets) == 9L)
 
 one_rep <- function(arm, rep_i) {
   seed <- 4200L + rep_i + if (arm == "positive") 1000L else 0L
+
+  # The negative arm contains only null sites.
+  # The positive arm contains a strong effect at every site.
   eff  <- if (arm == "positive") c(`0.20` = N_SITES) else c(`0.20` = 0L)
   sim  <- simulate_editing_data(
     n_null = if (arm == "positive") 0L else N_SITES,
@@ -61,6 +59,8 @@ one_rep <- function(arm, rep_i) {
   fwrite(sim$editing, dp, sep = "\t")
 
   count <- function(lab, tag) {
+    # Replace the sample labels with the current labelling and run the same
+    # differential testing procedure used for the permutation analysis.
     mp <- file.path(tmp, sprintf("m_%s_%02d_%s.txt", arm, rep_i, tag))
     fwrite(data.table(sample = sim$metadata$sample, condition = lab), mp, sep = "\t")
     r <- tryCatch(as.data.table(differential_editing(
@@ -68,13 +68,19 @@ one_rep <- function(arm, rep_i) {
            reference_level = "control", case_level = "case",
            random_effects = "(1 | sample)", n_cores = N_CORES, verbose = FALSE)),
          error = function(e) NULL)
+
+    # Return the number of significant sites, or NA if the model fails.
     if (is.null(r)) NA_integer_ else sum(r$GLMM_sig, na.rm = TRUE)
   }
 
+  # Test the true labels and then each permuted labelling.
   truth_lab <- as.character(sim$metadata$condition)
   obs  <- count(truth_lab, "TRUE")
   nul  <- vapply(seq_along(labsets), function(i) count(labsets[[i]], sprintf("%02d", i)), integer(1))
   nul  <- nul[!is.na(nul)]
+
+  # Calculate the empirical p-value by comparing the true result with the
+  # distribution produced by the permuted labels.
   data.table(arm = arm, rep = rep_i, true_n = obs,
              null_mean = mean(nul), null_max = max(nul), n_nulls = length(nul),
              emp_p = (sum(nul >= obs) + 1) / (length(nul) + 1))
@@ -84,6 +90,8 @@ res <- rbindlist(lapply(c("negative", "positive"), function(a)
          rbindlist(lapply(seq_len(N_REP), function(i) {
            x <- one_rep(a, i); cat(sprintf("%-8s rep %2d  true %4d  null mean %6.1f  p %.3f\n",
                                            a, i, x$true_n, x$null_mean, x$emp_p)); x }))))
+
+# Save the QC results for later inspection.
 fwrite(res, "qc_permutation_null.txt", sep = "\t")
 
 cat("\n================ PERMUTATION QC ================\n")

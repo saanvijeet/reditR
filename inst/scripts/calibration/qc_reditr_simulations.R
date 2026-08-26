@@ -1,41 +1,32 @@
 # qc_reditr_simulations.R
 #
-# Quality control on reditR::simulate_editing_data(), the generator behind the
-# parametric arm of the reditR validation.
+# Quality control for reditR::simulate_editing_data(), which is used for the
+# parametric validation of reditR.
 #
-# WHY. The parametric sweep tests reditR against its OWN generative model. If
-# that model does not resemble real editing data, a clean pass there means
-# little — and, more importantly, the false-positive rates it reports would be
-# LOWER BOUNDS. This script asks two separate questions:
+# This script checks two aspects of the simulator:
 #
-#   A. PARAMETER RECOVERY — does the simulator produce what it was asked for?
-#      baseline_rate, mean_coverage, sample_re_sd, n_per_condition, and the
-#      declared true_effect must all be recoverable from the output. This is a
-#      check on the simulator itself.
+#   A. PARAMETER RECOVERY — whether the simulated data match the parameters
+#      used to generate them, including baseline editing rate, coverage,
+#      sample-level variation, sample number and effect size.
 #
-#   B. REALISM — does simulated data resemble the real datasets? The decisive
-#      quantity is OVERDISPERSION. The simulator draws counts as binomial
-#      conditional on a per-sample random intercept, so within a condition,
-#      once the random effect is accounted for, residual variance should be
-#      binomial (dispersion phi ~ 1). Real editing data may be more variable
-#      than that. If real phi >> simulated phi, the simulation is an easier
-#      problem than reality and its FPRs understate the true ones.
+#   B. REALISM — whether simulated data have similar properties to the real
+#      datasets. Dispersion is compared because the simulator assumes
+#      binomial variation after accounting for sample-level random effects.
 #
-# Dispersion is measured per site x condition as the Pearson chi-square
-# statistic over its degrees of freedom:
-#     p_hat = sum(edited)/sum(total)
-#     phi   = sum( (edited_j - total_j*p_hat)^2 / (total_j*p_hat*(1-p_hat)) ) / (n-1)
-# phi ~ 1 is binomial; phi > 1 is overdispersed.
+# Dispersion is calculated for each site x condition group using the Pearson
+# chi-square statistic:
+#     p_hat = sum(edited) / sum(total)
+#     phi   = Pearson statistic / (n - 1)
 #
-# phi is a within-group variance and does not exist for a site x condition
-# group holding one observation, so the table also carries pct_estimable and
-# n_median. All three datasets are profiled, but they are not equally
-# informative: endothelial2 is 3 replicates per arm with sites called per
-# sample, and roughly half its groups are singletons. It is reported twice --
-# over all estimable groups, and over sites detected in all 9 samples -- since
-# those two subsets disagree by a factor of ~2 and straddle phi = 1.
+# A phi value near 1 is consistent with binomial variation, while values above
+# 1 indicate additional variation.
 #
-# Output: qc_reditr_simulations.txt (tables), console report
+# Dispersion cannot be estimated for groups with only one observation, so the
+# proportion of estimable groups and median group size are also reported.
+# endothelial2 is reported both using all sites and using sites detected in
+# all 9 samples because many site x condition groups contain only one sample.
+#
+# Output: qc_reditr_simulations.txt
 
 suppressPackageStartupMessages({ library(data.table); library(reditR) })
 H <- "/rds/general/user/sj1825/home"
@@ -43,6 +34,8 @@ setwd(file.path(H, "msc_prj"))
 set.seed(20260812)
 
 dispersion <- function(d) {
+  # Calculate the dispersion of editing counts for each site and condition.
+  # Groups with fewer than two observations cannot have a variance estimate.
   # d: site, sample, edited, total, condition
   d <- d[total > 0]
   d[, {
@@ -71,12 +64,13 @@ rec <- rbindlist(lapply(seq_len(nrow(grid)), function(i) {
   e <- merge(e, as.data.table(s$truth), by = "site")
   nulls <- e[true_effect == 0]
 
-  # between-sample SD on the logit scale, from control samples of null sites
+  # Estimate sample-level variation on the logit scale using null control sites.
   ctrl <- nulls[condition == "control" & edited > 0 & edited < total]
   lg <- ctrl[, .(l = qlogis(sum(edited) / sum(total))), by = .(site, sample)]
   sd_obs <- lg[, .(s = sd(l)), by = site][, median(s, na.rm = TRUE)]
 
-  # realised effect: case minus control mean ratio, per declared effect size
+  # Estimate the realised effect size as the difference between case and
+  # control editing rates.
   eff <- e[true_effect > 0, .(r = sum(edited) / sum(total)), by = .(site, condition, true_effect)]
   eff <- dcast(eff, site + true_effect ~ condition, value.var = "r")
   cl <- setdiff(names(eff), c("site", "true_effect", "control"))
@@ -94,6 +88,8 @@ rec <- rbindlist(lapply(seq_len(nrow(grid)), function(i) {
 }))
 print(rec)
 report$recovery <- rec
+
+# Check that the main simulated parameters are recovered.
 cat("\n  expected: samples = 2*npc | sites = 900 | baseline ~ 0.100 | coverage ~ 30\n")
 cat("  expected: sd_logit_obs tracks sigma_set | delta_XX ~ its nominal effect size\n")
 
@@ -102,12 +98,8 @@ cat("  expected: sd_logit_obs tracks sigma_set | delta_XX ~ its nominal effect s
 # =====================================================================
 cat("\n\n=========== B. REALISM vs REAL DATA ===========\n")
 
-# Dispersion is a WITHIN-group variance, so it does not exist for a
-# site x condition group holding a single observation. That is not a nuisance
-# to be hidden: in a small design with sites called per sample, most groups
-# can be singletons and the median phi is then computed on an unrepresentative
-# minority of sites. pct_estimable and n_median are reported next to phi so
-# the reader can judge how much weight the phi column carries.
+# Summarise dispersion and basic coverage/editing-rate properties for each
+# dataset. Only groups with at least two observations contribute to phi.
 disp_row <- function(nm, e) {
   e <- e[total > 0]
   grp <- e[, .N, by = .(site, condition)]
@@ -129,16 +121,18 @@ sim_disp <- rbindlist(lapply(c(0, 0.25, 1.0), function(sg) {
 }))
 
 real <- list()
+
+# Load the real diabetes dataset and its sample metadata.
 dia <- merge(fread(file.path(H, "diabetes_output/filtered_sites_clustered_t.txt")),
              fread(file.path(H, "diabetes_output/sample_metadata.txt")), by = "sample")
 real[["diabetes cardiomyocytes (6v6)"]] <- dia[, .(site, sample, edited, total, condition)]
 
+# Load the real mouse pseudobulk dataset.
 mo <- fread("/rds/general/user/sj1825/ephemeral/mec_dehydration/sprint_output_full/all_ec_clustered_with_condition.txt")
 real[["mouse pseudobulk"]] <- mo[, .(site, sample, edited, total, condition)]
 
-# endothelial2: 3 arms x 3 replicates. Reported as two subsets because they
-# disagree by a factor of ~2 and neither is the obviously correct one; see the
-# note printed below the table.
+# Load endothelial2. It is also analysed using a subset containing sites
+# detected in all 9 samples, because dispersion requires repeated observations.
 en <- merge(fread(file.path(H, "endothelial2/output/filtered_sites_clustered.txt")),
             fread(file.path(H, "endothelial2/output/sample_metadata.txt")), by = "sample")
 en <- en[, .(site, sample, edited, total, condition)]
@@ -146,6 +140,7 @@ real[["endothelial2 (3x3), all sites"]] <- en
 complete <- en[total > 0, uniqueN(sample), by = site][V1 == uniqueN(en$sample), site]
 real[["endothelial2 (3x3), 9-sample sites"]] <- en[site %in% complete]
 
+# Combine the simulated and real-data summaries.
 real_disp <- rbindlist(lapply(names(real), function(nm) disp_row(nm, real[[nm]])))
 
 disp <- rbind(sim_disp, real_disp)
@@ -153,6 +148,8 @@ disp[, `:=`(phi_median = round(phi_median, 2), ratio_median = round(ratio_median
 print(disp)
 report$dispersion <- disp
 
+# Explain how to interpret the dispersion and why the estimable proportion
+# is reported alongside it.
 cat("\n  phi ~ 1 means residual variance is binomial, as the simulator assumes.\n")
 cat("  phi >> simulated means real data is harder than the simulation, and the\n")
 cat("  sweep's false-positive rates are LOWER BOUNDS on the real ones.\n")
@@ -163,6 +160,7 @@ cat("  seen in all 9 samples makes phi estimable throughout but selects the\n")
 cat("  best-covered sites, and the two subsets straddle phi = 1. Neither is\n")
 cat("  precise enough to place against the simulated range on its own.\n")
 
+# Save the parameter-recovery and dispersion summaries.
 fwrite(rec,  "qc_reditr_simulations.txt", sep = "\t")
 fwrite(disp, "qc_reditr_simulations.txt", sep = "\t", append = TRUE, col.names = TRUE)
 cat("\nWritten: qc_reditr_simulations.txt\n")
