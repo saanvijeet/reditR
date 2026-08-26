@@ -1,39 +1,29 @@
 # reditr_shared_effect_sim.R
 #
-# Does a SHARED sample effect reproduce the inflation that permutation finds
-# and reditR's own simulator does not?
+# Tests whether a shared sample-level effect can reproduce the false-positive
+# inflation seen in the real data but not in reditR's default simulator.
 #
-# BACKGROUND. reditR::simulate_editing_data() draws its random intercept
-# inside the per-site loop:
+# reditR's simulator generates a new random effect for each sample at every
+# site. Therefore, variation affecting one sample at one site is independent
+# of that sample's variation at other sites. Real samples can instead show
+# consistent genome-wide differences, so this script tests whether including
+# this shared effect changes calibration.
 #
-#     rows <- lapply(seq_len(nrow(truth)), function(i) {   # per SITE
-#         sample_re <- rnorm(length(all_samples), 0, sample_re_sd)
-#         p <- plogis(qlogis(mean_rates) + sample_re)
+# The simulation compares two modes:
+#   per-site: random effects are regenerated for every site, matching the
+#             current reditR simulator.
+#   shared:   one random effect is generated per sample and reused across sites.
 #
-# so a sample that runs hot at one site has no tendency to run hot at the
-# next. Measured empirically, that produces a per-sample coherent offset of
-# 0.0038 at sample_re_sd = 1.0, against 0.0136 in the real diabetes data and
-# 0.1946 in the real mouse data. Real samples carry genome-wide offsets the
-# simulator cannot generate at any parameter value — and a shared sample
-# effect is precisely what the GLMM's (1 | sample) term exists to absorb.
+# Both modes use the same baseline editing rates, coverage, sample sizes and
+# effect sizes. The only difference is whether the sample effect is shared
+# across sites.
 #
-# THIS SCRIPT reproduces reditR's generator exactly, changing one thing: the
-# random intercept is drawn ONCE per sample and reused at every site. Counts
-# are otherwise identical in construction:
-#     mean_rates = baseline_rate (+ effect in the case arm), clipped to [.001,.999]
-#     p          = plogis(qlogis(mean_rates) + sample_re)
-#     total      = pmax(10, rnbinom(mu = mean_coverage, size = 5))
-#     edited     = rbinom(n, total, p)
+# The coherent_offset measure checks whether the shared simulation actually
+# produces consistent sample-level differences across sites.
 #
-# Both modes are generated at each setting so the comparison is like-for-like,
-# and the coherent-offset diagnostic is reported alongside the false-positive
-# rate to confirm the intended structure was actually created.
-#
-# PREDICTION. If the shared effect is the missing ingredient, the shared mode
-# should inflate the false-positive rate at sigma values where the per-site
-# mode stays near nominal — and should do so at the low sigma that matches the
-# real diabetes data, which is where the parametric sweep currently and
-# wrongly reports good calibration.
+# The main outcome is the false-positive rate (FPR). If shared sample effects
+# are responsible for the inflation seen in real data, the shared mode should
+# show greater FPR than the per-site mode.
 #
 # Output: reditr_shared_effect_sim.txt
 
@@ -52,7 +42,10 @@ COV     <- as.integer(Sys.getenv("COVERAGE", "30"))
 
 tmpdir <- file.path(OUT, "shared_effect_tmp"); dir.create(tmpdir, showWarnings = FALSE)
 
-# reditR's generator, with `shared` controlling where the rnorm is drawn.
+# Generate simulated editing data using either a shared or per-site sample
+# random effect. Keeping all other parts of the simulation identical allows
+# differences in FPR and power to be attributed to how the random effect is
+# generated.
 sim_data <- function(npc, sigma, shared, seed) {
   set.seed(seed)
   samples <- c(paste0("ctrl_", seq_len(npc)), paste0("case_", seq_len(npc)))
@@ -76,7 +69,8 @@ sim_data <- function(npc, sigma, shared, seed) {
   list(editing = rows, metadata = meta, truth = truth)
 }
 
-# the diagnostic from the QC: does a sample carry a genome-wide offset?
+# Measure whether samples show a consistent editing-rate deviation across
+# sites. A larger value indicates a stronger shared sample-level effect.
 coherent_offset <- function(e) {
   x <- copy(e)[total >= 10]
   x[, r := edited / total][, dev := r - mean(r), by = .(site, condition)]
@@ -122,16 +116,26 @@ for (i in seq_len(nrow(grid))) {
 out <- rbindlist(rows)
 fwrite(out, "reditr_shared_effect_sim.txt", sep = "\t")
 
+# Compare the measured sample-level offset between the two simulation modes.
+# The real-data values provide a reference for how much coherent variation
+# was observed in the diabetes and mouse datasets.
 cat("\n\n===== coherent per-sample offset (structure check) =====\n")
 print(dcast(out[test == "GLMM"], sigma ~ mode, value.var = "coherent_offset",
             fun.aggregate = function(x) round(mean(x), 4)))
 cat("  real diabetes = 0.0136 | real mouse = 0.1946\n")
+
+# Compare false-positive rates between the two simulation modes. A higher FPR
+# in the shared mode would indicate that shared sample effects can contribute
+# to the inflation seen in the real-data analyses.
 cat("\n===== false-positive rate at FDR<0.05 =====\n")
 for (tst in c("GLMM", "Fisher")) {
   cat("--", tst, "\n")
   print(dcast(out[test == tst], sigma ~ mode, value.var = "fpr",
               fun.aggregate = function(x) round(mean(x), 4)))
 }
+
+# Compare power for sites with a known true effect of 0.10 between the two
+# simulation modes.
 cat("\n===== power at true effect 0.10 =====\n")
 print(dcast(out[test == "GLMM"], sigma ~ mode, value.var = "power_10",
             fun.aggregate = function(x) round(mean(x), 3)))
