@@ -130,4 +130,3 @@ sweep re-run on a design carrying a covariate before it is recommended.
 - Add a test asserting `covariates = NULL` reproduces the current formula
   byte-for-byte, and one asserting a missing covariate column errors up front
   rather than returning all-`NA`.
-- Add a `NEWS.md` entry under the next version.

@@ -22,11 +22,6 @@ Two of the seven exported functions, `simulate_editing_data()` and
 `validate_against_truth()`, have no tests. They are exercised by the
 calibration scripts under `inst/scripts/calibration/` rather than by the suite.
 
-(`permutation_pvalue` was removed from `test-differential.R` during the 0.2.0
-rewrite: it was declared as an export and tested, but never implemented
-anywhere in the package, so that test would have errored against a clean
-install.)
-
 ---
 
 ## Step 1: Installing devtools, roxygen2, testthat
@@ -269,8 +264,8 @@ The `.()` shorthand used in `data.table` aggregations is not a formally exported
 `differential_editing()` was redesigned around three independent,
 user-selectable tests (`test = c("glmm","fisher","wilcoxon")`), each run on
 every site and each independently BH-corrected, with no combined `DRE`
-verdict. Full rationale in `NEWS.md`. The package also moved out of the
-`msc_prj` monorepo into its own standalone repository at this point.
+verdict. The package also moved out of the `msc_prj` monorepo into its own
+standalone repository at this point.
 
 ### Discovered in the process
 
@@ -286,13 +281,6 @@ in `R/reditR-package.R` and re-running `roxygen2::roxygenise()`.
 (reporting `NaN` for the DRE row) rather than erroring. Rewritten to detect
 whichever `<Test>_sig` columns are actually present in the `differential_editing()`
 output and report false-positive rate / power per test found, generically.
-
-**`permutation_pvalue()` was already broken pre-0.2.0.** It was declared in
-`NAMESPACE`/`man/permutation_pvalue.Rd`/`tests/testthat/test-differential.R`,
-but never defined anywhere in `R/`. Calling it would have errored on a clean
-install. Re-running `roxygen2::roxygenise()` correctly dropped the export
-and orphaned man page once nothing in `R/` backed it. Not reimplemented as
-part of this rewrite -- flagged as a separate, pre-existing gap.
 
 ### Result after fix
 
@@ -310,14 +298,14 @@ dissertation rather than here.
 
 | Check | Result |
 |---|---|
-| `devtools::document()` | OK, Rd files regenerated, `permutation_pvalue.Rd` correctly dropped |
+| `devtools::document()` | OK, Rd files regenerated |
 | `devtools::test()` | 47/47 pass |
 | Real-data smoke test | Matched an independent from-scratch script exactly |
 
 ## Changes since
 
 This document records the setup and verification work carried out up to the
-0.2.0 rewrite. Three releases have followed, each described in `NEWS.md`:
+0.2.0 rewrite. Three releases have followed:
 
 | Version | Change |
 |---|---|

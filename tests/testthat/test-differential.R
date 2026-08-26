@@ -161,8 +161,8 @@ test_that("summary file is written with expected rows when summary_path is provi
   expect_true("Fisher_sig" %in% sumdt$metric)
   expect_true("Wilcox_sig" %in% sumdt$metric)
 
-  # Monte Carlo results should not be included because this analysis
-  # does not use a Monte Carlo permutation test.
+  # The summary should report only the requested tests. Any other metric
+  # appearing here would mean an unrequested result had reached the output.
   expect_false("monte_carlo_pvalue" %in% sumdt$metric)
 })
 
