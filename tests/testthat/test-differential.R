@@ -161,9 +161,11 @@ test_that("summary file is written with expected rows when summary_path is provi
   expect_true("Fisher_sig" %in% sumdt$metric)
   expect_true("Wilcox_sig" %in% sumdt$metric)
 
-  # The summary should report only the requested tests. Any other metric
-  # appearing here would mean an unrequested result had reached the output.
-  expect_false("monte_carlo_pvalue" %in% sumdt$metric)
+  # The summary should report the site count and the three requested tests,
+  # and nothing else. An extra metric here would mean a result the caller did
+  # not ask for had reached the output.
+  expect_setequal(sumdt$metric,
+                  c("sites_tested", "GLMM_sig", "Fisher_sig", "Wilcox_sig"))
 })
 
 
