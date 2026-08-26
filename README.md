@@ -80,7 +80,7 @@ res[GLMM_sig == TRUE & Wilcox_sig == TRUE]   # your own AND, if you want one
 
 ```r
 sim <- simulate_editing_data(n_null = 800, n_effects = c("0.10" = 100, "0.20" = 100))
-res <- differential_editing(...)   # run on sim$editing / sim$metadata
+res <- differential_editing(..., case_level = "case")   # run on sim$editing / sim$metadata
 val <- validate_against_truth(res, sim$truth)
 print(val)   # false-positive rate and power, reported per test requested
 ```

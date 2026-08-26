@@ -11,6 +11,7 @@ simulate_editing_data(
   baseline_rate = 0.1,
   mean_coverage = 30L,
   sample_re_sd = 0.3,
+  condition_labels = c("control", "case"),
   seed = 42L
 )
 }
@@ -31,6 +32,12 @@ Default 0.10.}
 
 \item{sample_re_sd}{Standard deviation of the per-sample random effect on
 the logit scale. Default 0.3.}
+
+\item{condition_labels}{Length-2 character vector naming the reference and
+case conditions, in that order. Default \code{c("control", "case")}. The
+simulated effect is applied to the second label, and these are the values
+to pass as \code{reference_level} and \code{case_level} when handing the
+result to \code{\link{differential_editing}}.}
 
 \item{seed}{Random seed for reproducibility. Default 42.}
 }

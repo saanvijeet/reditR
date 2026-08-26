@@ -162,6 +162,7 @@ write.table(as.data.frame(sim$editing),  tmp_sim_ed, sep = "\t", row.names = FAL
 write.table(as.data.frame(sim$metadata), tmp_sim_mt, sep = "\t", row.names = FALSE, quote = FALSE)
 
 res2 <- differential_editing(tmp_sim_ed, tmp_sim_mt,
+                             reference_level = "control", case_level = "case",
                              test = c("glmm", "wilcoxon"), verbose = FALSE)
 val  <- validate_against_truth(res2, sim$truth)
 print(val)

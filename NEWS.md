@@ -1,3 +1,27 @@
+# reditR 0.2.3
+
+* `simulate_editing_data()` gains a `condition_labels` argument, replacing the
+  hardcoded `"control"` / `"diabetic"` arm names. The default is now
+  `c("control", "case")`. The labels are arbitrary names for the two arms and
+  do not enter the generative model, so simulated counts are unchanged for a
+  given seed -- only the `condition` column of the returned metadata differs.
+  The previous names were residue from the package having been written against
+  the cardiomyocyte dataset first, and made every calibration script pass
+  `case_level = "diabetic"` to simulations that had nothing to do with
+  diabetes.
+
+  **Note the resulting asymmetry:** `differential_editing()` and
+  `editing_difference()` still default to `case_level = "diabetic"`, so
+  handing simulated data straight to either with default arguments now errors.
+  It errors up front with a clear message rather than silently returning all
+  `NA` (see 0.2.2), but the case level must be supplied. Changing those
+  defaults is a breaking change and is deferred.
+
+  Callers updated: `inst/scripts/calibration/reditr_shared_effect_sim.R` and
+  `qc_permutation_null.R`, the vignette, and the README example.
+  `reditr_parametric_null.R` needed no change -- it already derives the case
+  level from the simulated metadata rather than assuming it.
+
 # reditR 0.2.2
 
 * Test coverage for the negative direction in `editing_difference()`. The

@@ -65,7 +65,7 @@ one_rep <- function(arm, rep_i) {
     fwrite(data.table(sample = sim$metadata$sample, condition = lab), mp, sep = "\t")
     r <- tryCatch(as.data.table(differential_editing(
            data_path = dp, meta_path = mp, test = "glmm",
-           reference_level = "control", case_level = "diabetic",
+           reference_level = "control", case_level = "case",
            random_effects = "(1 | sample)", n_cores = N_CORES, verbose = FALSE)),
          error = function(e) NULL)
     if (is.null(r)) NA_integer_ else sum(r$GLMM_sig, na.rm = TRUE)

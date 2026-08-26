@@ -98,7 +98,7 @@ for (i in seq_len(nrow(grid))) {
   fwrite(s$editing, dp, sep = "\t"); fwrite(s$metadata, mp, sep = "\t")
   res <- tryCatch(differential_editing(
       data_path = dp, meta_path = mp, test = c("glmm", "fisher", "wilcoxon"),
-      reference_level = "control", case_level = "diabetic",
+      reference_level = "control", case_level = "case",
       random_effects = "(1 | sample)", out_path = file.path(tmpdir, paste0("r_", key, ".txt")),
       summary_path = file.path(tmpdir, paste0("s_", key, ".txt")),
       n_cores = N_CORES, verbose = FALSE),
