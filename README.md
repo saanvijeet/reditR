@@ -3,8 +3,24 @@
 > Differential RNA editing analysis for bulk and single-cell pseudobulk data.
 
 reditR provides statistical tools for detecting differentially RNA-edited (DRE)
-sites from SPRINT-derived read-count tables. It is the statistical downstream
-layer of the SPRINT pipeline. 
+sites from per-site, per-sample read-count tables, such as those derived from
+SPRINT output. It is the statistical downstream layer of an editing-detection
+pipeline: the package API begins at the count table, and site detection itself
+is performed externally.
+
+## Requirements
+
+R >= 4.0.0.
+
+| Type | Packages |
+|---|---|
+| Imports | `data.table`, `dplyr`, `lme4`, `parallel`, `stats`, `tidyr` |
+| Suggests | `testthat` (>= 3.0.0), `knitr`, `rmarkdown` |
+
+Installing with `devtools::install_github()` will pull the imports
+automatically. **SPRINT is not an R package and is not installed by reditR.** It
+is an external tool that must be installed separately if you intend to run the
+detection stage; reditR does not call it.
 
 ## Installation
 
@@ -13,78 +29,230 @@ layer of the SPRINT pipeline.
 devtools::install_github("saanvijeet/reditR")
 ```
 
-## Quick example
+## Input formats
+
+Two tab-separated files are required. Both are read with
+`data.table::fread()`, so any delimiter it auto-detects will work, but
+tab-separated is what the shipped pipeline scripts produce.
+
+### Editing count table
+
+One row per site per sample. Required columns:
+
+| Column | Type | Description |
+|---|---|---|
+| `site` | character | Site identifier, unique per genomic position |
+| `sample` | character | Sample identifier, matching the metadata file |
+| `edited` | integer | Number of reads supporting the edited base |
+| `total` | integer | Total reads covering the site in that sample |
+
+```
+site        sample    edited    total
+chr1_100    ctrl_1    2         30
+chr1_100    ctrl_2    1         25
+chr1_100    diab_1    8         35
+chr1_200    ctrl_1    1         28
+```
+
+An `edit_ratio` column may be present but is not required: it is computed as
+`edited / total` where absent. Additional columns are permitted and are used
+where the analysis needs them, for example grouping columns named in
+`random_effects`. Note that `read_editing_table()` returns only
+`site`, `sample`, `edited`, `total` and `edit_ratio`, so if you need extra
+columns downstream, pass the file path directly to the analysis functions
+rather than routing it through the reader.
+
+### Sample metadata
+
+One row per sample. Required columns:
+
+| Column | Type | Description |
+|---|---|---|
+| `sample` | character | Sample identifier, matching the count table |
+| `condition` | character | Experimental group label |
+
+```
+sample    condition
+ctrl_1    control
+ctrl_2    control
+diab_1    diabetic
+diab_2    diabetic
+```
+
+Only the two conditions named by `reference_level` and `case_level` are
+analysed; other rows are dropped, so a multi-arm experiment is run as a series
+of pairwise comparisons. Both defaults must be checked against your own labels:
+`reference_level` defaults to `"control"` and `case_level` to `"diabetic"`. If
+either is absent from the data, the analysis stops with an error naming the
+levels that are available.
+
+`reference_level` sets the baseline of the comparison. The reported effect is
+case relative to reference, so reversing the two reverses the sign. If the
+metadata file already contains a `condition` column merged into the count table,
+`meta_path` may be omitted.
+
+## Functions
+
+**Input**
+
+| Function | Description |
+|---|---|
+| `read_editing_table()` | Read and validate a count table, computing `edit_ratio` if absent |
+| `read_metadata()` | Read and validate a metadata file, optionally setting the reference level as the first factor level |
+
+**Filtering**
+
+| Function | Description |
+|---|---|
+| `filter_editing_sites()` | Apply per-observation coverage, edited-read and editing-ratio thresholds, a minimum-sample requirement, and identify genomically clustered sites |
+
+**Testing**
+
+| Function | Description |
+|---|---|
+| `differential_editing()` | Run any subset of three significance tests per site, each independently FDR-corrected |
+
+**Effect sizes**
+
+| Function | Description |
+|---|---|
+| `editing_difference()` | Per-site mean editing ratio in each condition and their signed difference, ordered by absolute effect |
+
+**Simulation and validation**
+
+| Function | Description |
+|---|---|
+| `simulate_editing_data()` | Generate synthetic count data with known planted effects |
+| `validate_against_truth()` | Score analysis output against simulated truth, reporting convergence, false-positive rate and power per test |
+
+## Minimal reproducible example
+
+The package bundles a small example dataset so the workflow can be run without
+your own data. It contains 2 sites across 6 samples, 3 control and 3 diabetic,
+and uses the default condition labels.
 
 ```r
 library(reditR)
 
-# 1. Read data
-ed <- read_editing_table("filtered_sites_clustered.txt")
-mt <- read_metadata("sample_metadata.txt", reference_level = "control")
+ed <- system.file("extdata", "example_editing.txt",  package = "reditR")
+mt <- system.file("extdata", "example_metadata.txt", package = "reditR")
 
-# 2. Filter (or use filter_editing_sites() for SPRINT output)
-# filter_editing_sites("all_samples_editing.txt", out_dir = "results/")
+# Inspect the inputs
+read_editing_table(ed)
+read_metadata(mt, reference_level = "control")
 
-# 3. Run differential analysis -- pick the test(s) that suit your design
-res <- differential_editing(
-  data_path = "filtered_sites_clustered.txt",
-  meta_path = "sample_metadata.txt",
-  test      = c("glmm", "fisher", "wilcoxon"),
-  out_path  = "DRE_results.txt"
-)
+# Differential testing
+res <- differential_editing(ed, mt,
+                            test    = c("glmm", "fisher", "wilcoxon"),
+                            verbose = FALSE)
+res
 
-# 4. Effect sizes - computes the mean editing ratio for each site and condition
-eff <- editing_difference("filtered_sites_clustered.txt", meta_path = "sample_metadata.txt")
-head(eff)
+# Effect sizes
+editing_difference(ed, meta_path = mt)
 ```
 
-## Pipeline integration
+`res` contains one row per site with, for each requested test, a raw p-value, a
+BH-adjusted value and a logical call: `glmm_pvalue` / `GLMM_FDR` / `GLMM_sig`,
+and correspondingly `fisher_pvalue` / `Fisher_FDR` / `Fisher_sig` and
+`wilcox_pvalue` / `Wilcox_FDR` / `Wilcox_sig`. No combined verdict column is
+produced; intersect the columns yourself if you want one.
 
-The SPRINT output parsing script is shipped at:
+`editing_difference()` returns `site`, a mean column per condition named from
+the labels (here `control_mean` and `diabetic_mean`), and `editing_difference`,
+the case minus reference difference.
+
+The example is small enough that the GLMM produces a singular fit warning. This
+is expected at this size and does not indicate an error.
+
+## Simulation
 
 ```r
-system.file("scripts", "extracting_read_counts.sh", package = "reditR")
+sim <- simulate_editing_data(n_null = 40, n_effects = c("0.20" = 10),
+                             n_per_condition = 4, seed = 1)
+
+d <- tempfile(); m <- tempfile()
+data.table::fwrite(sim$editing,  d, sep = "\t")
+data.table::fwrite(sim$metadata, m, sep = "\t")
+
+res <- differential_editing(d, m, test = c("glmm", "fisher"),
+                            case_level = "case", verbose = FALSE)
+validate_against_truth(res, sim$truth)
 ```
 
-Run it on your HPC to produce `all_samples_editing.txt`, then call
-`filter_editing_sites()` from within R.
+`simulate_editing_data()` labels its arms `control` and `case` by default, set
+by `condition_labels`, so `case_level = "case"` must be passed explicitly since
+`differential_editing()` defaults to `"diabetic"`.
 
 ## Methodology
 
-reditR offers **three independent significance tests**, each run on every
-site and independently Benjamini-Hochberg FDR corrected. Pick
-whichever test(s) suit your experimental design with the `test` argument
-(any subset of `c("glmm", "fisher", "wilcoxon")`), and compare the
-`<Test>_sig`/`<Test>_FDR` columns you asked for directly.
+reditR offers three independent significance tests, each run on every site and
+independently Benjamini-Hochberg FDR corrected. Select them with the `test`
+argument, which accepts any subset of `c("glmm", "fisher", "wilcoxon")`.
 
-| Test | Model | Notes |
+| Test | Model | What it uses |
 |---|---|---|
-| **GLMM** | `cbind(edited, unedited) ~ condition + (1\|sample)` | Primary test (Srivastava et al. 2017). Can be severely anti-conservative when between-replicate variance is high relative to the number of independent control replicates. |
-| **Fisher** | Exact test on pooled per-sample counts | Independent of GLMM. Anti-conservative whenever real between-replicate variance is present, regardless of dataset -- and unlike GLMM, adding replicates does not fix it. |
-| **Wilcoxon** | Rank-sum on per-sample editing ratios | The most consistently well-calibrated test across every design checked, at the cost of lower power and a coarse p-value floor at small sample sizes. |
+| **GLMM** | `cbind(edited, unedited) ~ condition + <random_effects>` | Binomial mixed model on read counts. The fixed effect is `condition`; the random-effects term is supplied by the caller through the `random_effects` argument. The unit of replication is whatever grouping variable that term names. Fitted with `lme4::glmer()`. |
+| **Fisher** | Exact test on a 2x2 table of pooled counts | Edited and unedited reads summed across all samples within each condition. Sample identity is not represented, so the unit of replication is the read. |
+| **Wilcoxon** | Rank-sum on per-sample editing ratios | Ranks `edited / total` per sample and compares the two condition groups. The unit of replication is the sample; read depth does not enter beyond forming the ratio. |
 
-**Which test should I use?** This isn't a rule of thumb — it comes from
-running permutation and parametric null-calibration simulations across three
-independent datasets (see the package vignette for methodology). A design
-with few, unbalanced, or confounded replicates should lean on Wilcoxon; a
-well-powered, balanced design can reasonably use GLMM; Fisher should be
-treated cautiously whenever real between-replicate variance is plausible.
-Requesting more than one test lets you compare them directly instead of
-trusting either in isolation:
+The `random_effects` argument takes a character string giving everything after
+`condition +` in the formula. The default is `"(1 | sample)"`, appropriate for
+bulk data where each sample is one biological replicate:
 
 ```r
-res[GLMM_sig == TRUE & Wilcox_sig == TRUE]   # your own AND, if you want one
+# Bulk: one random intercept per sample
+differential_editing(ed, mt, random_effects = "(1 | sample)")
+
+# Pseudobulk: crossed terms, where each row is a library-cluster unit
+differential_editing(ed, mt,
+                     random_effects = "(1 | library) + (1 | cluster_id)")
 ```
 
-## Simulation and power analysis
+Any grouping column named in `random_effects` must be present in the count
+table. The function checks this before fitting and stops with an error naming
+any missing column.
+
+## Pipeline integration
+
+The steps upstream of the count table are shell and Python scripts, run outside
+R. They are shipped with the package for reference and are located with
+`system.file("scripts", "<name>", package = "reditR")`.
+
+| Script | Language | Role |
+|---|---|---|
+| `build_splitter_annotation.sh` | shell | Build the barcode-to-cluster annotation table required by the BAM splitter, from CellRanger output |
+| `bam_extract_barcode_reads_commandline_chr_V2.py` | Python | Split a multiplexed single-cell BAM into per-cell-type BAMs using that annotation |
+| `scrna_preprocessing.sh` | shell | Single-cell driver: splits the BAM, converts each per-cell-type BAM to FASTQ, then runs SPRINT per cell type |
+| `bulk_bam_to_fastq.sh` | shell | Convert a bulk BAM to FASTQ for SPRINT input. Only needed when starting from BAM rather than FASTQ |
+| `extracting_read_counts.sh` | shell | Parse `SPRINT_identified_regular.res` files into the combined `all_samples_editing.txt` count table |
+
+`inst/scripts/test_data/mouse/` additionally holds the two R scripts that built
+the barcode-to-cluster annotations for the mouse dataset analysed in the
+dissertation. They are records of that specific analysis rather than portable
+utilities.
+
+`inst/scripts/calibration/` holds the scripts and outputs for the calibration
+and validation analyses, documented in their own README.
+
+The R workflow starts once `all_samples_editing.txt` exists:
 
 ```r
-sim <- simulate_editing_data(n_null = 800, n_effects = c("0.10" = 100, "0.20" = 100))
-res <- differential_editing(..., case_level = "case")   # run on sim$editing / sim$metadata
-val <- validate_against_truth(res, sim$truth)
-print(val)   # false-positive rate and power, reported per test requested
+filter_editing_sites("all_samples_editing.txt", out_dir = "results/")
 ```
+
+## Testing
+
+```r
+devtools::test()
+```
+
+The suite comprises 37 test blocks and 75 expectations across four files,
+covering the readers, the filtering thresholds and their boundary behaviour,
+the three significance tests and their independent FDR correction, the
+random-effects specification, condition-level handling, and effect-size sign
+and ordering. `R CMD check` runs it automatically.
 
 ## Citation
 
-TBD
+Jiteendra, S. (2026). *Differential RNA editing analysis across bulk and
+single-cell pseudobulk datasets.* MSc dissertation, Imperial College London.
