@@ -1,0 +1,15 @@
+sigma_set	npc_set	samples_obs	sites_obs	baseline_obs	coverage_obs	sd_logit_obs	delta_05	delta_10	delta_20
+0	3	6	900	0.1003	30.1	0.466	0.0542	0.1079	0.1978
+0	6	12	900	0.099	30.2	0.542	0.0464	0.1015	0.1906
+0.25	3	6	900	0.1056	30	0.495	0.0511	0.0968	0.1994
+0.25	6	12	900	0.1024	29.8	0.576	0.0582	0.1036	0.2079
+1	3	6	900	0.1347	30	0.809	0.067	0.0769	0.2105
+1	6	12	900	0.1327	29.9	0.873	0.0327	0.1152	0.1881
+source	phi_median	pct_estimable	n_median	cov_median	ratio_median	n_site_cond
+simulated, sigma=0.00	0.9	100	6	28	0.095	1600
+simulated, sigma=0.25	1.08	100	6	28	0.098	1600
+simulated, sigma=1.00	3.13	100	6	28	0.1	1600
+diabetes cardiomyocytes (6v6)	0.71	71.6	2	32	0.167	69979
+mouse pseudobulk	2.95	86.5	3	37	0.233	36718
+endothelial2 (3x3), all sites	0.65	45.3	1	21	0.229	25575
+endothelial2 (3x3), 9-sample sites	1.43	100	3	41	0.357	327

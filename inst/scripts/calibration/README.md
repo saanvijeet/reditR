@@ -52,6 +52,9 @@ a contiguous chunk, and write chunk-suffixed output so concurrent tasks cannot
 overwrite each other. Concatenate and **deduplicate by permutation index**
 before scoring.
 
+See `outputs/` for the results these scripts produced, with a README mapping
+each file to what it supports.
+
 `qc_permutation_null.R` validates the permutation *procedure* rather than any
 dataset, using positive and negative controls on simulated data with known
 truth. Run it if you adapt the permutation code: it is what establishes that a
@@ -68,9 +71,11 @@ is near-degenerate there.
 
 ## Things worth knowing before citing the outputs
 
-**Truth values are not stored in the permutation output files.** They were only
-printed to console. Scoring against a row of a permutation file yields a
-permuted value, not the observed one.
+**Observed values are not stored in the diabetes and mouse permutation output
+files.** They were only printed to console. Scoring against a row of one of
+those files yields a permuted value, not the observed one — the observed counts
+are in `outputs/observed_values.txt`. The endothelial files do carry theirs, as
+the row with `null == 0`.
 
 **The GLMM is reproducible to roughly ±0.5% on the mouse data.** Where
 permutations were inadvertently repeated, Fisher agreed exactly on all of them
