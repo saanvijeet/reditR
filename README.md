@@ -254,5 +254,4 @@ and ordering. `R CMD check` runs it automatically.
 
 ## Citation
 
-Jiteendra, S. (2026). *Differential RNA editing analysis across bulk and
-single-cell pseudobulk datasets.* MSc dissertation, Imperial College London.
+Saanvi Jiteendra, MSc Dissertation, Genomic Medicine, Imperial College London.
