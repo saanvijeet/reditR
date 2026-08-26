@@ -264,13 +264,12 @@ The `.()` shorthand used in `data.table` aggregations is not a formally exported
 
 ---
 
-## Step 6: 0.2.0 rewrite, three independent tests, no Monte Carlo
+## Step 6: 0.2.0 rewrite, three independent tests
 
-`differential_editing()` was redesigned from a GLMM-primary /
-Wilcoxon-robustness-flag / Monte-Carlo-overlap framework to three
-independent, user-selectable tests (`test = c("glmm","fisher","wilcoxon")`,
-each run on every site, each independently BH-corrected, no combined `DRE`
-verdict). Full rationale in `NEWS.md`. Package also moved out of the
+`differential_editing()` was redesigned around three independent,
+user-selectable tests (`test = c("glmm","fisher","wilcoxon")`), each run on
+every site and each independently BH-corrected, with no combined `DRE`
+verdict. Full rationale in `NEWS.md`. The package also moved out of the
 `msc_prj` monorepo into its own standalone repository at this point.
 
 ### Discovered in the process
