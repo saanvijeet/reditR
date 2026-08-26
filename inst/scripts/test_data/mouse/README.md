@@ -1,4 +1,4 @@
-# Mouse dehydration dataset — barcode-to-cluster annotation builders
+# Mouse dehydration dataset: barcode-to-cluster annotation builders
 
 The two R scripts in this directory are the ones that produced the cluster
 annotations used in the mouse analysis (Dumas et al. 2020 renal endothelial
@@ -21,7 +21,7 @@ Run order: CellRanger &rarr; these scripts &rarr; `../../scrna_preprocessing.sh`
    36,348 cell columns.
 2. Locate the row flagged `sel.K == "TRUE"` and stop if there is not exactly
    one. **`sel.K` marks the clustering SCEA displays by default, which is the
-   output of Scanpy's Louvain algorithm at its default resolution of 1.0** — it
+   output of Scanpy's Louvain algorithm at its default resolution of 1.0**. It
    is a software default, not a resolution selected as best-supported for this
    experiment. For E-MTAB-8145 that resolution yields K = 20. Note that K is
    *derived* from `sel.K` here, never hardcoded.
@@ -43,7 +43,7 @@ This differs from `../../build_splitter_annotation.sh`, which sits one level up
 and carries `MIN_CELLS=30`. That shell script is the **MEC5 single-library
 smoke test** (`SAMPLE_PREFIX="SAMEA11354569"`, paths under `mec5_smoketest/`);
 it did not produce the analysed annotations. Do not cite it as the method for
-the full dataset — doing so would assert a filter that never ran.
+the full dataset, since doing so would assert a filter that never ran.
 
 The consequence is visible downstream: the analysed dataset contains **192**
 cluster-level pseudobulk units across 13 libraries (45 control, 147
@@ -54,7 +54,7 @@ deliberately whether to keep that behaviour or add a threshold; it is recorded
 here rather than silently corrected.
 
 These figures come from `all_ec_clustered_with_condition.txt`, the input the
-differential analysis actually consumed — 18,359 sites, matching the DRE output
+differential analysis actually consumed: 18,359 sites, matching the DRE output
 row for row. An earlier revision of this README quoted 96 units / median 17 /
 39 below 10 sites; those came from a superseded 1,781-site file of the same
 name in a different directory and did not describe the analysed data.
@@ -68,8 +68,8 @@ GEC1–5. CEC4 is in neither. The downstream sample list is fixed in
 
 ## Portability
 
-Both scripts hardcode absolute paths — `$EPHEMERAL/mec_dehydration/…` for
-CellRanger output and `$HOME/msc_prj/test_data_mouse/` for the clusters TSV —
+Both scripts hardcode absolute paths (`$EPHEMERAL/mec_dehydration/…` for
+CellRanger output and `$HOME/msc_prj/test_data_mouse/` for the clusters TSV)
 and an explicit accession-to-library map. They are a record of what was run, not
 a portable utility. To reuse them, edit `WORK_BASE`, `CR_BASE`, `CLUSTERS_TSV`
 and the `samea` vector. The only dependency is **data.table**.

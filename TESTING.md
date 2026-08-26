@@ -1,4 +1,4 @@
-# reditR — Testing Log
+# reditR Testing Log
 
 ## Overview
 
@@ -10,18 +10,22 @@ This document records the full testing workflow for the `reditR` package: the to
 
 Tests are written using **testthat 3rd edition** and live in `tests/testthat/`. There are 4 test files covering all major functions:
 
-| File | Functions tested | Expectations |
-|---|---|---|
-| `test-io.R` | `read_editing_table`, `read_metadata` | 11 |
-| `test-filter.R` | `filter_editing_sites` | 6 |
-| `test-differential.R` | `differential_editing` (three-independent-test API) | 22 |
-| `test-effect_size.R` | `editing_difference` | 8 |
-| **Total** | | **47** (0 failures) |
+| File | Functions tested | Blocks | Expectations |
+|---|---|---|---|
+| `test-io.R` | `read_editing_table`, `read_metadata` | 6 | 11 |
+| `test-filter.R` | `filter_editing_sites` | 9 | 15 |
+| `test-differential.R` | `differential_editing` | 13 | 33 |
+| `test-effect_size.R` | `editing_difference` | 9 | 16 |
+| **Total** | | **37** | **75** (0 failures) |
 
-(Counts as of the 0.2.0 rewrite -- see "Step 6" below. `permutation_pvalue`
-was removed from `test-differential.R`: it was declared as an export and
-tested, but never actually implemented anywhere in the package, so that test
-always would have errored if run against a clean install.)
+Two of the seven exported functions, `simulate_editing_data()` and
+`validate_against_truth()`, have no tests. They are exercised by the
+calibration scripts under `inst/scripts/calibration/` rather than by the suite.
+
+(`permutation_pvalue` was removed from `test-differential.R` during the 0.2.0
+rewrite: it was declared as an export and tested, but never implemented
+anywhere in the package, so that test would have errored against a clean
+install.)
 
 ---
 
@@ -153,7 +157,7 @@ editing_summary <- data[, .(
 ), by = site]
 ```
 
-The example data file (`inst/extdata/example_editing.txt`) only has columns `site`, `sample`, `edited`, and `total` — it does not include a pre-computed `edit_ratio` column. The function never computed it before trying to use it.
+The example data file (`inst/extdata/example_editing.txt`) only has columns `site`, `sample`, `edited`, and `total`; it does not include a pre-computed `edit_ratio` column. The function never computed it before trying to use it.
 
 ### Fix
 
@@ -202,9 +206,9 @@ Found the following files with non-ASCII characters:
 
 The `∩` (intersection) symbol had been used in two places to represent the logical AND of GLMM and Wilcoxon results:
 
-- `R/differential.R` line 126 — in a comment
-- `R/differential.R` line 155 — inside a `cat()` call
-- `R/simulate.R` line 179 — inside a `cat()` / `sprintf()` call
+- `R/differential.R` line 126, in a comment
+- `R/differential.R` line 155, inside a `cat()` call
+- `R/simulate.R` line 179, inside a `cat()` / `sprintf()` call
 
 **Fix:** Replaced `∩` with `&` in all three locations.
 
@@ -253,14 +257,14 @@ The `.()` shorthand used in `data.table` aggregations is not a formally exported
 
 | Check | Result |
 |---|---|
-| `devtools::document()` | OK — 10 Rd files generated |
-| `devtools::install()` | OK — `* DONE (reditR)` |
+| `devtools::document()` | OK, 10 Rd files generated |
+| `devtools::install()` | OK, `* DONE (reditR)` |
 | `devtools::test()` | 42/42 pass |
 | `devtools::check()` | 0 errors, 0 warnings, 0 notes |
 
 ---
 
-## Step 6: 0.2.0 rewrite — three independent tests, no Monte Carlo
+## Step 6: 0.2.0 rewrite, three independent tests, no Monte Carlo
 
 `differential_editing()` was redesigned from a GLMM-primary /
 Wilcoxon-robustness-flag / Monte-Carlo-overlap framework to three
@@ -298,15 +302,29 @@ devtools::test(".")
 [ FAIL 0 | WARN 0 | SKIP 0 | PASS 47 ]
 ```
 
-Also smoke-tested against real (non-toy) data -- 36,764-site diabetic
-endothelial dataset, all three tests requested, `n_cores = 4` -- results
-matched an independent from-scratch script (`GLMM_sig = 106`,
-`Fisher_sig = 250`) exactly.
+Also smoke-tested against a real (non-toy) dataset with all three tests
+requested and `n_cores = 4`, and the results matched an independent
+from-scratch script exactly. The counts themselves are reported in the
+dissertation rather than here.
 
-## Final Package State (0.2.0)
+## Package state at the 0.2.0 rewrite
 
 | Check | Result |
 |---|---|
-| `devtools::document()` | OK — Rd files regenerated, `permutation_pvalue.Rd` correctly dropped |
+| `devtools::document()` | OK, Rd files regenerated, `permutation_pvalue.Rd` correctly dropped |
 | `devtools::test()` | 47/47 pass |
-| Real-data smoke test | Matches independent script exactly (106 GLMM_sig, 250 Fisher_sig on 36,764 sites) |
+| Real-data smoke test | Matched an independent from-scratch script exactly |
+
+## Changes since
+
+This document records the setup and verification work carried out up to the
+0.2.0 rewrite. Three releases have followed, each described in `NEWS.md`:
+
+| Version | Change |
+|---|---|
+| 0.2.1 | `random_effects` argument, allowing crossed or nested terms for pseudobulk designs |
+| 0.2.2 | Explicit condition contrast, `min_edit_ratio`, paired-end handling in `bulk_bam_to_fastq.sh`, and added test coverage for the negative direction in `editing_difference()` |
+| 0.2.3 | `condition_labels` argument for `simulate_editing_data()` |
+
+The test-suite table at the top of this document reflects the current suite,
+not the 47 expectations recorded above for 0.2.0.

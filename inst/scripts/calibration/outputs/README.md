@@ -63,10 +63,10 @@ walltime failures produced 560 rows for 285 permutations. This file is those
 rows deduplicated by permutation index, keeping the first occurrence.
 
 Among the 275 repeated indices, Fisher agreed exactly every time, while the
-**GLMM disagreed on 134 of them** — median spread 0 sites, maximum 18, out of
-roughly 780. That is `glmer` convergence jitter at borderline sites. It does
-not move the empirical p, but mouse GLMM site counts should not be quoted to
-the last digit.
+**GLMM disagreed on 134 of them**, with median spread 0 sites and maximum 18,
+out of roughly 780. That is `glmer` convergence jitter at borderline sites. It
+does not move the empirical p, but mouse GLMM site counts should not be quoted
+to the last digit.
 
 **The mouse null is not like-for-like with the other two.** Condition is
 completely confounded with timepoint and partly with compartment balance, so

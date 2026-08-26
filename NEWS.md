@@ -37,7 +37,7 @@
   behaviour was already correct, but it was not pinned.
 
 * New `inst/scripts/calibration/`: the scripts used to assess whether
-  `differential_editing()` controls its false discovery rate — the parametric
+  `differential_editing()` controls its false discovery rate: the parametric
   sweep over between-sample variance and sample size, QC on the simulator, the
   shared-effect and cross-site-correlation experiments, and the four
   permutation nulls (one per dataset, since the labelling space depends on the
@@ -75,10 +75,9 @@
 
 * `filter_editing_sites()` documentation now states that only
   quality-control filters are supported, and that design-dependent
-  filters -- requiring a site in both arms, for example -- belong with
-  the caller, since they depend on the contrast rather than on data
-  quality and do not generalise across two-arm, multi-arm and paired
-  designs. The two-line idiom is given in `@details`.
+  filters, such as requiring a site in both arms, belong with the caller,
+  since they depend on the contrast rather than on data quality and do not
+  generalise across two-arm, multi-arm and paired designs.
 
 * `inst/scripts/bulk_bam_to_fastq.sh` now handles paired-end BAMs. It
   previously passed only `-fq` to `bamToFastq`, which writes both mates
