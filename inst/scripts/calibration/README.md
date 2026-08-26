@@ -51,8 +51,8 @@ an effect is unknown; simulation can, but only under its own model.
 | `reditr_permutation_null_endo2.R` | Endothelial knockdown, 3 vs 3 per arm | Site-level null, exhaustive |
 | `reditr_permutation_null_endo2_genes.R` | Endothelial knockdown, 3 vs 3 per arm | Gene-level null; p-value diagnostics |
 | `reditr_permutation_null_mouse.R` | Mouse pseudobulk, 3 vs 10 libraries | Site-level null, crossed random effects |
-| `perm_null_diabetes_array.pbs` | — | PBS array driver, cardiomyocyte |
-| `perm_null_mouse_array.pbs` | — | PBS array driver, mouse |
+| `perm_null_diabetes_array.pbs` | n/a | PBS array driver, cardiomyocyte |
+| `perm_null_mouse_array.pbs` | n/a | PBS array driver, mouse |
 
 ## Parametric simulation
 
@@ -63,8 +63,8 @@ holding true-null sites plus equal numbers carrying three known effect sizes on
 the probability scale, then runs `differential_editing()` for the GLMM, Fisher's
 exact test and the Wilcoxon rank-sum test. Results are joined to the truth
 table, and false-positive rate, power overall and at each effect size, and the
-proportion of sites returning a p-value — for the GLMM, the convergence rate —
-are computed per test.
+proportion of sites returning a p-value (for the GLMM, the convergence rate) are
+computed per test.
 
 Null and effect sites share a dataset so both quantities come from the same run:
 comparing tests on power alone is uninformative when their false-positive rates
@@ -74,11 +74,11 @@ direction.
 `qc_reditr_simulations.R` verifies that the simulator produces what it was asked
 for, comparing recovered sample and site counts, baseline editing rate,
 coverage, logit-scale variance and realised effect sizes against the requested
-values. It then compares dispersion — Pearson chi-square over its degrees of
-freedom, per site and condition — between simulated and observed data, since the
-parametric arm is informative only if the simulation is not an easier problem
-than reality. As dispersion is undefined for a site and condition seen in one
-sample, the proportion of estimable groups is reported alongside it.
+values. It then compares dispersion, measured as Pearson chi-square over its
+degrees of freedom per site and condition, between simulated and observed data,
+since the parametric arm is informative only if the simulation is not an easier
+problem than reality. As dispersion is undefined for a site and condition seen
+in one sample, the proportion of estimable groups is reported alongside it.
 
 ### Shared sample-effect simulation
 
@@ -86,8 +86,8 @@ sample, the proportion of estimable groups is reported alongside it.
 so a sample running high at one site has no tendency to do so at the next. Real
 data need not behave this way: a library with a systematic offset would deviate
 coherently across many sites at once. `reditr_shared_effect_sim.R` isolates this
-distinction, changing exactly one thing — whether the random effect is drawn
-once per site or once per sample and reused across sites — while holding
+distinction, changing exactly one thing, namely whether the random effect is
+drawn once per site or once per sample and reused across sites, while holding
 baseline rates, coverage, sample sizes and effect sizes constant. Both modes are
 generated at every setting so the comparison is like-for-like, and a coherent
 per-sample offset statistic confirms the manipulation produced the intended
@@ -166,9 +166,9 @@ the other two.
 
 `reditr_permutation_null_endo2_genes.R` repeats the endothelial permutations,
 recording results at both site and gene level. Sites are mapped to annotated
-gene symbols, and a gene counts as significant if at least one of its sites is —
-the same rule used in the corresponding observed analysis, so permuted and
-observed counts follow identical logic. A gene-level null must be generated
+gene symbols, and a gene counts as significant if at least one of its sites is.
+This is the same rule used in the corresponding observed analysis, so permuted
+and observed counts follow identical logic. A gene-level null must be generated
 explicitly rather than derived from site counts, because the mapping depends on
 how significant sites distribute across genes.
 
