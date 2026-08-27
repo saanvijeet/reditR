@@ -105,16 +105,11 @@ effect and a variance component has little room for more, and the datasets this
 package was developed on carry 6 to 13 samples. Check that the design supports
 the adjusted model before reading anything into its p-values.
 
-The null-calibration work is the reason to check. The Wald statistic is already
-unreliable at some sites in small designs: a number of sites returned p-values
-between 1e-119 and true double-precision underflow, where a likelihood ratio
-test on the same fitted models returned p between 0.59 and 1.00. Those sites
-were *not* the singular ones, so the failure is in the Wald approximation to a
-non-quadratic likelihood surface rather than in degenerate variance estimation.
-Adding fixed terms to a model already at the edge of identifiability makes that
-worse. On larger designs the adjustment is straightforward; on a 6-sample
-design it may not be estimable site by site, and the calibration sweep should
-be re-run on a design carrying a covariate before the results are relied on.
+Adding fixed terms to a model already at the edge of identifiability makes it
+harder to fit, not easier. On larger designs the adjustment is
+straightforward; on a 6-sample design it may not be estimable site by site, and
+the calibration sweep should be re-run on a design carrying a covariate before
+the results are relied on.
 
 ### Also do
 
