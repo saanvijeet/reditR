@@ -1,14 +1,12 @@
 # reditR Developer Notes
 
-Design decisions and worked examples for changes that have been considered but
-not implemented. Each entry records enough detail that the change can be made
-without re-deriving it, and states why it was left out.
+Implementation guides for extensions to the package. Each entry carries enough
+detail to make the change without re-deriving it, together with the conditions
+the change assumes.
 
 ---
 
 ## Adding clinical covariates to the GLMM
-
-**Status:** not implemented.
 
 The fixed-effects side of the GLMM formula is `condition` alone
 (`R/differential.R`, in the `if ("glmm" %in% test)` block):
@@ -19,17 +17,14 @@ glmm_formula <- stats::as.formula(
 )
 ```
 
-`random_effects` (added in 0.2.1) opened up the random side, so a caller can
-pass crossed or nested grouping terms for pseudobulk data. There is no
-equivalent for the fixed side, so a clinical or technical variable (age, sex,
-HbA1c, batch) cannot currently be adjusted for.
+`random_effects` (added in 0.2.1) opens up the random side, so a caller can
+pass crossed or nested grouping terms for pseudobulk data. The fixed side has
+no equivalent, so adjusting for a clinical or technical variable (age, sex,
+HbA1c, batch) means the four edits below. Only the first two touch the model.
 
-### What the change would look like
+### 1. Take the covariates as an argument
 
-Four edits, of which only the first two touch the model.
-
-**1. Take the covariates as an argument.** Default `NULL`, so every existing
-call behaves identically:
+Default `NULL`, so every existing call behaves identically:
 
 ```r
 differential_editing <- function(data_path,
@@ -39,7 +34,7 @@ differential_editing <- function(data_path,
                                  ...)
 ```
 
-**2. Paste them into the fixed side, next to `condition`:**
+### 2. Paste them into the fixed side, next to `condition`
 
 ```r
 fixed <- paste(c("condition", covariates), collapse = " + ")
@@ -57,13 +52,14 @@ cbind(edited, unedited) ~ condition + age + sex + (1 | sample)
 and with `covariates = NULL` it collapses to the current formula exactly, so
 the default path is unchanged.
 
-**3. Check the columns exist before fitting anything.** Without this a typo
-returns `NA` at every site. This is the failure mode of the `reference_level`
-bug present in 0.2.1 and fixed in 0.2.2, where the error was swallowed by the
-per-site `tryCatch()` and the result was indistinguishable from universal
-convergence failure. The existing
-random-effects check already covers covariate names once they are in the
-formula; it only needs generalising from "random effects" to "formula":
+### 3. Check the columns exist before fitting anything
+
+Without this a typo returns `NA` at every site. That is the failure mode of the
+`reference_level` bug present in 0.2.1 and fixed in 0.2.2, where the error was
+swallowed by the per-site `tryCatch()` and the result was indistinguishable
+from universal convergence failure. The existing random-effects check already
+covers covariate names once they are in the formula; it only needs generalising
+from "random effects" to "formula":
 
 ```r
 fixed_vars <- setdiff(all.vars(glmm_formula),
@@ -74,8 +70,10 @@ if (length(missing) > 0)
        paste(missing, collapse = ", "))
 ```
 
-**4. Nothing in `run_glmm()` changes.** It fits whatever formula it is given,
-and the p-value is looked up by coefficient name:
+### 4. Leave `run_glmm()` alone
+
+It fits whatever formula it is given, and the p-value is looked up by
+coefficient name:
 
 ```r
 coef_name <- paste0("condition", case_level)
@@ -83,8 +81,8 @@ summary(m)$coefficients[coef_name, "Pr(>|z|)"]
 ```
 
 Additional fixed terms shift the condition coefficient's row position without
-affecting a name-based lookup. The reported p-value stays the condition
-effect, now adjusted for the covariates.
+affecting a name-based lookup. The reported p-value stays the condition effect,
+now adjusted for the covariates.
 
 ### Requirements on the covariates
 
@@ -94,39 +92,36 @@ effect, now adjusted for the covariates.
   carry it if it is present in `meta_path`.
 - **Must be constant within a sample.** A per-row covariate would be modelling
   something other than a donor characteristic.
-- **Must not be collinear with `condition`.** A variable that only takes one
-  value in each arm (a treatment given only to cases, say) cannot be separated
-  from the condition effect and produces a rank-deficient fit.
+- **Must not be collinear with `condition`.** A variable taking one value in
+  each arm (a treatment given only to cases, say) cannot be separated from the
+  condition effect and produces a rank-deficient fit.
 - **Categorical covariates should be factors.** A character column is coerced
   with alphabetical level ordering, the same trap that made the explicit
   `condition` contrast necessary in 0.2.2.
 
-### Why it is not implemented
+### Sizing the model
 
-Degrees of freedom. The model is fitted **per site**, so each covariate costs
-a degree of freedom at every site, and the datasets this package was developed
-on carry 6 to 13 samples. A per-site model already estimating an intercept, a
-condition effect and a variance component has very little room for more.
+The model is fitted **per site**, so each covariate costs a degree of freedom
+at every site. A per-site model already estimating an intercept, a condition
+effect and a variance component has little room for more, and the datasets this
+package was developed on carry 6 to 13 samples. Check that the design supports
+the adjusted model before reading anything into its p-values.
 
-The null-calibration work is relevant here. The Wald statistic is already
-unreliable at some sites in these datasets: a small number returned p-values
+The null-calibration work is the reason to check. The Wald statistic is already
+unreliable at some sites in small designs: a number of sites returned p-values
 between 1e-119 and true double-precision underflow, where a likelihood ratio
 test on the same fitted models returned p between 0.59 and 1.00. Those sites
 were *not* the singular ones, so the failure is in the Wald approximation to a
-non-quadratic likelihood surface rather than in degenerate variance
-estimation. Adding fixed terms to a model already at the edge of
-identifiability would be expected to make that worse, not better.
+non-quadratic likelihood surface rather than in degenerate variance estimation.
+Adding fixed terms to a model already at the edge of identifiability makes that
+worse. On larger designs the adjustment is straightforward; on a 6-sample
+design it may not be estimable site by site, and the calibration sweep should
+be re-run on a design carrying a covariate before the results are relied on.
 
-So the argument against is not that the change is difficult, since it is four
-edits and two of them are trivial, but that on a design of this size the
-adjusted model is unlikely to be estimable site by site. The change is worth
-making for callers with larger sample sizes; it should ship with a note in
-`?differential_editing` recording the above, and ideally with the calibration
-sweep re-run on a design carrying a covariate before it is recommended.
-
-### If implemented, also
+### Also do
 
 - Add a `covariates` entry to the roxygen block and re-run `roxygenise()`.
+- Record the sizing caveat above in `?differential_editing`.
 - Add a test asserting `covariates = NULL` reproduces the current formula
   byte-for-byte, and one asserting a missing covariate column errors up front
   rather than returning all-`NA`.
