@@ -1,8 +1,6 @@
 # reditR Developer Notes
 
-Implementation guides for extensions to the package. Each entry carries enough
-detail to make the change without re-deriving it, together with the conditions
-the change assumes.
+Implementation guides for extensions to the package. 
 
 ---
 
