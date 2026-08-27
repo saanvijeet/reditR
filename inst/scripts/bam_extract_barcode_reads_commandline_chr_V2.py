@@ -2,6 +2,12 @@
 # =============================================================================
 # bam_extract_barcode_reads_commandline_chr_V2.py  —  reditR pipeline utility
 # =============================================================================
+# Provenance:
+#   Derived from the PPS framework's barcode read-extraction utility, adapted
+#   here for the reditR single-cell preprocessing pipeline. Included so the
+#   preprocessing steps can be reproduced; the original implementation is not
+#   the work of this package's author.
+#
 # Purpose:
 #   Split a multiplexed single-cell BAM file into per-cell-type BAM files
 #   using a barcode-to-cell-type annotation table.
