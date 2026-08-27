@@ -99,17 +99,25 @@ now adjusted for the covariates.
 
 ### Sizing the model
 
-The model is fitted **per site**, so each covariate costs a degree of freedom
-at every site. A per-site model already estimating an intercept, a condition
-effect and a variance component has little room for more, and the datasets this
-package was developed on carry 6 to 13 samples. Check that the design supports
-the adjusted model before reading anything into its p-values.
+A separate model is fitted at every site, and each one has only your samples to
+work with. With six samples, the model is already estimating three things from
+six numbers: a baseline editing rate, the difference between the two
+conditions, and how much samples vary among themselves. Every covariate you add
+is one more thing estimated from those same six numbers.
 
-Adding fixed terms to a model already at the edge of identifiability makes it
-harder to fit, not easier. On larger designs the adjustment is
-straightforward; on a 6-sample design it may not be estimable site by site, and
-the calibration sweep should be re-run on a design carrying a covariate before
-the results are relied on.
+Eventually there is not enough data to go round. When that happens `glmer`
+either fails to fit, and the site returns `NA`, or it returns something that
+looks like a p-value but should not be trusted. The second case is the
+dangerous one, because nothing in the output tells you it happened.
+
+The datasets this package was built on have 6 to 13 samples, which is small
+enough that even one covariate may not fit. Larger designs have more room, and
+that is where this argument is worth using.
+
+Whatever the size, do not judge it by eye. Run the calibration sweep in
+`inst/scripts/calibration/` on a simulated design that matches yours and
+carries a covariate. That measures whether the p-values behave on a design of
+that size, which you cannot tell from the results themselves.
 
 ### Also do
 
