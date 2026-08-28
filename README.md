@@ -212,6 +212,15 @@ Any grouping column named in `random_effects` must be present in the count
 table. The function checks this before fitting and stops with an error naming
 any missing column.
 
+`min_obs` sets how many observations a site needs before the GLMM is fitted to
+it at all. The default is 4. A site with fewer rows than this is skipped and
+returns no GLMM p-value, because there is too little data to estimate an
+intercept, a condition effect and a variance component from. Fisher and
+Wilcoxon are unaffected by this setting, so the three tests can end up scored
+on different numbers of sites. If you report how many sites the GLMM called
+significant, give that count against the number of sites it actually fitted
+rather than the number tested.
+
 ## Pipeline integration
 
 The steps upstream of the count table are shell and Python scripts, run outside
